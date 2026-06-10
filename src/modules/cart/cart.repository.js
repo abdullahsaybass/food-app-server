@@ -2,9 +2,10 @@
 
 import { Cart } from './cart.model.js';
 
+// Select variants so the mapper can find the right unit's stock status
 const POPULATE_ITEMS = {
   path:   'items.product',
-  select: 'name price images unit category quantity isActive',
+  select: 'name images category isActive variants',
 };
 
 export const cartRepository = {

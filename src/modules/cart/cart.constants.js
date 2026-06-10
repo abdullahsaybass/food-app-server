@@ -10,8 +10,9 @@ export const CART_MESSAGES = {
 };
 
 export const CART_ERRORS = {
-  PRODUCT_NOT_FOUND:     'Product not found or is no longer available',
-  OUT_OF_STOCK:          'Product is out of stock',
-  INVALID_QUANTITY:      'Quantity must be at least 1',
-  ITEM_NOT_IN_CART:      'Item not found in cart',
+  PRODUCT_NOT_FOUND:  'Product not found or is no longer available',
+  VARIANT_NOT_FOUND:  'Selected variant is not available for this product',
+  OUT_OF_STOCK:       'Selected variant is out of stock',
+  INVALID_QUANTITY:   'Quantity must be at least 1',
+  ITEM_NOT_IN_CART:   'Item not found in cart',
 };

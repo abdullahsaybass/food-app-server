@@ -1,12 +1,13 @@
 import Product from "./product.model.js";
 
 // ─────────────────────────────────────────────
-// CREATE
+// 🔥 CREATE PRODUCT
 // ─────────────────────────────────────────────
-export const create = (data) => Product.create(data);
+export const create = (data) =>
+  Product.create(data);
 
 // ─────────────────────────────────────────────
-// FIND BY ID
+// 🔥 FIND PRODUCT BY ID
 // Only active + non-deleted products
 // ─────────────────────────────────────────────
 export const findById = (id) =>
@@ -16,50 +17,68 @@ export const findById = (id) =>
   });
 
 // ─────────────────────────────────────────────
-// FIND BY SKU
+// 🔥 FIND PRODUCT BY VARIANT SKU
 // ─────────────────────────────────────────────
-export const findBySku = (sku) =>
+export const findByVariantSku = (sku) =>
   Product.findOne({
-    sku: sku?.toUpperCase(),
+    "variants.sku": sku?.toUpperCase(),
     isDeleted: false,
   });
 
 // ─────────────────────────────────────────────
-// FIND ALL PRODUCTS
+// 🔥 FIND ALL PRODUCTS
 // ─────────────────────────────────────────────
-export const findAll = async ({ filter = {}, sort, skip, limit }) => {
+export const findAll = async ({
+  filter = {},
+  sort,
+  skip,
+  limit,
+}) => {
+
   const finalFilter = {
     ...filter,
     isDeleted: false,
   };
 
-  const [products, total] = await Promise.all([
-    Product.find(finalFilter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit),
+  const [products, total] =
+    await Promise.all([
 
-    Product.countDocuments(finalFilter),
-  ]);
+      Product.find(finalFilter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit),
 
-  return { products, total };
+      Product.countDocuments(finalFilter),
+    ]);
+
+  return {
+    products,
+    total,
+  };
 };
 
 // ─────────────────────────────────────────────
-// LOW STOCK PRODUCTS
+// 🔥 FIND LOW STOCK PRODUCTS
+// Checks variant stock levels
 // ─────────────────────────────────────────────
-export const findLowStock = () =>
-  Product.find({
+export const findLowStock = async () => {
+
+  const products = await Product.find({
     isActive: true,
     isDeleted: false,
-  }).then((products) =>
-    products.filter(
-      (product) => product.quantity <= product.stockThreshold
+  });
+
+  return products.filter((product) =>
+    product.variants.some(
+      (variant) =>
+        variant.quantity <=
+        variant.stockThreshold
     )
   );
+};
 
 // ─────────────────────────────────────────────
-// UPDATE PRODUCT
+// 🔥 UPDATE PRODUCT
 // ─────────────────────────────────────────────
 export const updateById = (id, data) =>
   Product.findOneAndUpdate(
@@ -67,9 +86,11 @@ export const updateById = (id, data) =>
       _id: id,
       isDeleted: false,
     },
+
     {
       $set: data,
     },
+
     {
       new: true,
       runValidators: true,
@@ -77,18 +98,22 @@ export const updateById = (id, data) =>
   );
 
 // ─────────────────────────────────────────────
-// HARD DELETE PRODUCT
-// Permanently removes from DB
+// 🔥 HARD DELETE PRODUCT
+// Permanently remove from DB
 // ─────────────────────────────────────────────
 export const deleteById = (id) =>
   Product.findByIdAndDelete(id);
 
 // ─────────────────────────────────────────────
-// SOFT DELETE PRODUCT
+// 🔥 SOFT DELETE PRODUCT
 // ─────────────────────────────────────────────
-export const softDeleteById = (id, updatedBy) =>
+export const softDeleteById = (
+  id,
+  updatedBy
+) =>
   Product.findByIdAndUpdate(
     id,
+
     {
       $set: {
         isActive: false,
@@ -96,13 +121,20 @@ export const softDeleteById = (id, updatedBy) =>
         updatedBy,
       },
     },
+
     {
       new: true,
     }
   );
 
-  // ─────────────────────────────────────────────
-// DISTINCT CATEGORIES
+// ─────────────────────────────────────────────
+// 🔥 DISTINCT CATEGORIES
 // ─────────────────────────────────────────────
 export const findDistinctCategories = () =>
-  Product.distinct('category', { isActive: true, isDeleted: false });
+  Product.distinct(
+    "category",
+    {
+      isActive: true,
+      isDeleted: false,
+    }
+  );

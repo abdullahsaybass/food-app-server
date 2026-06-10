@@ -1,135 +1,105 @@
-import jwt    from "jsonwebtoken";
-import crypto from "crypto";
-import { JWT_EXPIRES_IN, MESSAGES } from "./auth.constants.js";
-import * as repo from "./auth.repository.js";
-import * as authService from "./auth.service.js";
-
-// ─── Token helpers ────────────────────────────────────────────────────────────
-const generateAccessToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || JWT_EXPIRES_IN,
-  });
-
-const generateRefreshToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
-  });
+import { MESSAGES } from "./auth.constants.js";
+import * as service from "./auth.service.js";
 
 // ─── Register ─────────────────────────────────────────────────────────────────
-export const register = async ({ name, phone, email, password }) => {
-  const existing = await repo.findDuplicate(email, phone);
-  if (existing) {
-    return {
-      conflict: true,
-      message:
-        existing.email === email ? MESSAGES.EMAIL_TAKEN : MESSAGES.PHONE_TAKEN,
-    };
+export const register = async (req, res, next) => {
+  try {
+    const { name, phone, email, password } = req.validatedBody ?? req.body;
+
+    const result = await service.registerUser({ name, phone, email, password });
+
+    if (result.conflict) {
+      return res.status(409).json({ success: false, message: result.message });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: MESSAGES.REGISTER_SUCCESS,
+      data: {
+        user:         result.user,
+        accessToken:  result.accessToken,
+        refreshToken: result.refreshToken,
+      },
+    });
+  } catch (err) {
+    next(err);
   }
-
-  const user = await repo.createUser({ name, phone, email, password });
-
-  const accessToken  = generateAccessToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  await repo.saveRefreshToken(user._id, refreshToken);
-
-  const userObj = user.toObject();
-  delete userObj.password;
-  delete userObj.refreshToken;
-
-  return { user: userObj, accessToken, refreshToken };
 };
 
-
-
-// ─── LOGIN ───────────────────────────────────────────────────────────────
+// ─── Login ────────────────────────────────────────────────────────────────────
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.validatedBody ?? req.body;
 
-    // 1. Find user WITH password
-    const user = await repo.findByEmailWithPassword(email);
+    const result = await service.loginUser({ email, password });
 
-    if (!user) {
-      return res.status(401).json({
-        message: "Invalid credentials",
-      });
+    if (result.unauthorized) {
+      return res.status(401).json({ success: false, message: result.message });
+    }
+    if (result.forbidden) {
+      return res.status(403).json({ success: false, message: result.message });
     }
 
-    // 2. Check active
-    if (!user.isActive) {
-      return res.status(403).json({
-        message: "Account deactivated",
-      });
-    }
-
-    // 3. Compare password
-    const isMatch = await user.comparePassword(password);
-
-    if (!isMatch) {
-      return res.status(401).json({
-        message: "Invalid credentials",
-      });
-    }
-
-    // 4. Generate token
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    // 5. Update last login
-    user.lastLogin = new Date();
-    await user.save();
-
-    // 6. Send response
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Login successful",
-      token,
-      user: user.toSafeObject(),
+      message: MESSAGES.LOGIN_SUCCESS,
+      data: {
+        user:         result.user,
+        accessToken:  result.accessToken,
+        refreshToken: result.refreshToken,
+      },
     });
-
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
-export const logout = async (userId) => {
-  await repo.removeRefreshToken(userId);
+export const logout = async (req, res, next) => {
+  try {
+    await service.logoutUser(req.user._id);
+
+    return res.status(200).json({ success: true, message: MESSAGES.LOGOUT_SUCCESS });
+  } catch (err) {
+    next(err);
+  }
 };
 
-// ─── Refresh access token ─────────────────────────────────────────────────────
-export const refreshToken = async (refreshToken) => {
+// ─── Refresh token ────────────────────────────────────────────────────────────
+export const refreshToken = async (req, res, next) => {
   try {
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const { refreshToken: token } = req.body;
 
-    const user = await repo.findById(decoded.id);
-    if (!user || !user.refreshToken) return { unauthorized: true };
-    if (user.refreshToken !== refreshToken) return { unauthorized: true };
+    if (!token) {
+      return res.status(400).json({ success: false, message: "Refresh token is required" });
+    }
 
-    // Rotate both tokens
-    const newAccessToken  = generateAccessToken(user._id);
-    const newRefreshToken = generateRefreshToken(user._id);
+    const result = await service.refreshAccessToken(token);
 
-    await repo.saveRefreshToken(user._id, newRefreshToken);
+    if (result.unauthorized) {
+      return res.status(401).json({ success: false, message: MESSAGES.INVALID_TOKEN });
+    }
 
-    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
-  } catch {
-    return { unauthorized: true };
+    return res.status(200).json({
+      success: true,
+      data: {
+        accessToken:  result.accessToken,
+        refreshToken: result.refreshToken,
+      },
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
 // ─── Forgot password ──────────────────────────────────────────────────────────
 export const forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const { email } = req.validatedBody ?? req.body;
 
-    const result = await authService.forgotPassword(email);
+    const result = await service.forgotPassword(email);
 
-    res.status(200).json(result);
+    return res.status(200).json({ success: true, message: result.message });
   } catch (err) {
     next(err);
   }
@@ -139,16 +109,15 @@ export const forgotPassword = async (req, res, next) => {
 export const resetPassword = async (req, res, next) => {
   try {
     const { token } = req.params;
-    const { password } = req.body;
+    const { password } = req.validatedBody ?? req.body;
 
-    const result = await authService.resetPassword(token, password);
+    const result = await service.resetPassword(token, password);
 
     if (result.unauthorized) {
-      return res.status(401).json(result);
+      return res.status(401).json({ success: false, message: result.message });
     }
 
-    return res.status(200).json(result);
-
+    return res.status(200).json({ success: true, message: result.message });
   } catch (err) {
     next(err);
   }

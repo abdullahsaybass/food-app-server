@@ -74,16 +74,26 @@ export const removeProfilePic = asyncHandler(async (req, res) => {
 // ADDRESSES
 // ════════════════════════════════════════════════════════════════════════════════
 
+export const getAddresses = asyncHandler(async (req, res) => {
+  const result = await svc.getAddresses(req.user._id);
+  assertResult(result);
+ 
+  res_.success(res, {
+    message: MESSAGES.ADDRESSES_FETCHED,         // FIX: was inline "Addresses fetched" string
+    data: { addresses: toAddressList(result.addresses) },
+  });
+});
+ 
 export const addAddress = asyncHandler(async (req, res) => {
   const result = await svc.addAddress(req.user._id, req.validatedBody);
   assertResult(result);
-
+ 
   res_.created(res, {
     message: MESSAGES.ADDRESS_ADDED,
     data:    { addresses: toAddressList(result.addresses) },
   });
 });
-
+ 
 export const updateAddress = asyncHandler(async (req, res) => {
   const result = await svc.updateAddress(
     req.user._id,
@@ -91,17 +101,17 @@ export const updateAddress = asyncHandler(async (req, res) => {
     req.validatedBody
   );
   assertResult(result);
-
+ 
   res_.success(res, {
     message: MESSAGES.ADDRESS_UPDATED,
     data:    { addresses: toAddressList(result.addresses) },
   });
 });
-
+ 
 export const deleteAddress = asyncHandler(async (req, res) => {
   const result = await svc.deleteAddress(req.user._id, req.params.addressId);
   assertResult(result);
-
+ 
   res_.success(res, {
     message: MESSAGES.ADDRESS_DELETED,
     data:    { addresses: toAddressList(result.addresses) },
@@ -163,4 +173,10 @@ export const seedAdmin = asyncHandler(async (req, res) => {
     message: result.message || "Admin created",
     data: result.user || null,
   });
+});
+
+export const changePassword = asyncHandler(async (req, res) => {
+  const result = await svc.changePassword(req.user.id, req.validatedBody);
+  assertResult(result);
+  res_.success(res, { message: 'Password changed successfully' });
 });

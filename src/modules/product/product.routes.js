@@ -1,7 +1,5 @@
-// src/features/products/product.routes.js
-
 import { Router } from 'express';
-import { protect, adminOnly } from '../../middleware/auth.middleware.js';
+import { protect, adminOnly, optionalAuth } from '../../middleware/auth.middleware.js';
 import { upload, uploadToCloud, deleteFromCloudinary } from '../../middleware/upload.middleware.js';
 import {
   validateCreateProduct,
@@ -15,15 +13,13 @@ const router = Router();
 
 // -----------------------------------------------------------
 // 🔥 Image upload  →  POST /api/products/upload-images
-// Flow: multer buffers files → uploadToCloud streams to Cloudinary
-// Returns: { success: true, data: [{ url, publicId, altText }] }
 // -----------------------------------------------------------
 router.post(
   '/upload-images',
   protect,
   adminOnly,
-  upload.array('images', 5),   // your existing multer
-  uploadToCloud,                // streams buffers → Cloudinary
+  upload.array('images', 5),
+  uploadToCloud,
   (req, res) => {
     res.status(200).json({
       success: true,
@@ -51,21 +47,21 @@ router.delete(
 );
 
 // -----------------------------------------------------------
-// Authenticated users
+// 🌐 Public (guests + logged-in users can browse)
+// optionalAuth: attaches req.user if logged in, null if guest
 // -----------------------------------------------------------
-router.get('/', protect, validateListProducts, productController.listProducts);
-router.get('/categories', protect, productController.getCategories)
-router.get('/low-stock', protect, adminOnly, productController.getLowStockProducts);
-router.get('/:id', protect, productController.getProduct);
+router.get('/',            optionalAuth, validateListProducts, productController.listProducts);
+router.get('/categories',  optionalAuth, productController.getCategories);
+router.get('/:id',         optionalAuth, productController.getProduct);
 
-
 // -----------------------------------------------------------
-// Admin only
+// 🔒 Admin only — require login
 // -----------------------------------------------------------
-router.post('/', protect, adminOnly, validateCreateProduct, productController.createProduct);
-router.put('/:id', protect, adminOnly, validateUpdateProduct, productController.updateProduct);
-router.patch('/:id', protect, adminOnly, validateUpdateProduct, productController.updateProduct);
+router.get('/low-stock',   protect, adminOnly, productController.getLowStockProducts);
+router.post('/',           protect, adminOnly, validateCreateProduct,  productController.createProduct);
+router.put('/:id',         protect, adminOnly, validateUpdateProduct,  productController.updateProduct);
+router.patch('/:id',       protect, adminOnly, validateUpdateProduct,  productController.updateProduct);
 router.patch('/:id/deactivate', protect, adminOnly, productController.softDeleteProduct);
-router.delete('/:id', protect, adminOnly, productController.deleteProduct);
+router.delete('/:id',      protect, adminOnly, productController.deleteProduct);
 
 export default router;

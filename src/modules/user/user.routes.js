@@ -6,6 +6,7 @@ import {
   validateAddAddress,
   validateUpdateAddress,
   validateAdminUpdateUser,
+  validateChangePassword,
 } from "./user.validator.js";
 import {
   getMe,
@@ -21,6 +22,8 @@ import {
   adminUpdateUser,
   adminDeleteUser,
   seedAdmin,
+  getAddresses,
+  changePassword,
 } from "./user.controller.js";
 import { upload } from '../../middleware/upload.middleware.js';
 
@@ -46,6 +49,12 @@ userRouter.delete("/me/profile-pic", protect, removeProfilePic);
 userRouter.post("/me/addresses",              protect, validateAddAddress,  addAddress);
 userRouter.put("/me/addresses/:addressId",    protect, validateUpdateAddress, updateAddress);
 userRouter.delete("/me/addresses/:addressId", protect, deleteAddress);
+userRouter.get(
+  "/me/addresses",
+  protect,
+  getAddresses
+);
+userRouter.post('/change-password', protect, validateChangePassword, changePassword);
 
 // ─── Admin router — /api/admin/users ─────────────────────────────────────────
 export const adminUserRouter = express.Router();

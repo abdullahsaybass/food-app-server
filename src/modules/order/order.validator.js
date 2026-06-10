@@ -5,9 +5,12 @@ import { ORDER_STATUS, PAYMENT_STATUS } from "./order.constants.js";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 const orderItemSchema = Joi.object({
-  product:  Joi.string().hex().length(24).required().messages({
+  product: Joi.string().hex().length(24).required().messages({
     "string.hex":   "Product ID must be a valid ObjectId.",
     "any.required": "Product is required.",
+  }),
+  unit: Joi.string().required().messages({
+    "any.required": "Variant unit is required (e.g. \"1kg\", \"500g\").",
   }),
   quantity: Joi.number().integer().min(1).required().messages({
     "number.min":   "Quantity must be at least 1.",
@@ -16,22 +19,26 @@ const orderItemSchema = Joi.object({
 });
 
 const shippingAddressSchema = Joi.object({
-  label:      Joi.string().valid("home", "work", "other").default("home"),
-  fullName:   Joi.string().trim().min(2).max(100).required(),
-  phone:      Joi.string().trim().pattern(/^[6-9]\d{9}$/).required().messages({
-    "string.pattern.base": "Enter a valid 10-digit phone number.",
-  }),
-  street:     Joi.string().trim().min(2).max(200).required(),
-  city:       Joi.string().trim().min(2).max(100).required(),
-  state:      Joi.string().trim().min(2).max(100).required(),
-  postalCode: Joi.string().trim().pattern(/^\d{6}$/).required().messages({
-    "string.pattern.base": "Postal code must be 6 digits.",
-  }),
-  country:    Joi.string().trim().max(100).default("India"),
+  label:         Joi.string().trim().allow("").default(""),
+  fullName:      Joi.string().trim().min(2).max(100).required()
+                   .messages({ "any.required": "Full name is required." }),
+  phone:         Joi.string().trim().required()
+                   .messages({ "any.required": "Phone number is required." }),
+  street:        Joi.string().trim().allow("").default(""),
+  city:          Joi.string().trim().allow("").default(""),
+  state:         Joi.string().trim().allow("").default(""),
+  zip:           Joi.string().trim().allow("").default(""),
+  country:       Joi.string().trim().max(100).default("Maldives"),
+  // GPS coords for 30 km radius check
+  location: Joi.object({
+    latitude:  Joi.number().min(-90).max(90).allow(null).default(null),
+    longitude: Joi.number().min(-180).max(180).allow(null).default(null),
+  }).default({ latitude: null, longitude: null }),
+  locationLabel: Joi.string().trim().allow("").default(""),
 });
 
 const placeOrderSchema = Joi.object({
-  items:           Joi.array().items(orderItemSchema).min(1).required().messages({
+  items: Joi.array().items(orderItemSchema).min(1).required().messages({
     "array.min":    "Order must have at least one item.",
     "any.required": "Items are required.",
   }),
@@ -62,7 +69,7 @@ const adminOrdersQuerySchema = Joi.object({
   limit:         Joi.number().integer().min(1).max(100).default(20),
   status:        Joi.string().valid(...Object.values(ORDER_STATUS)).optional(),
   paymentStatus: Joi.string().valid(...Object.values(PAYMENT_STATUS)).optional(),
-  search:        Joi.string().trim().max(100).optional(), // orderNumber / name / phone
+  search:        Joi.string().trim().max(100).optional(),
   sortBy:        Joi.string().valid("createdAt", "totalAmount", "status").default("createdAt"),
   sortOrder:     Joi.string().valid("asc", "desc").default("desc"),
 });

@@ -63,6 +63,6 @@ export const paginate = async (
 
   return {
     data,
-    pagination: buildPaginationMeta({ total, page, limit }),
+    pagination: buildPaginationMeta({ page, limit, total }),
   };
 };

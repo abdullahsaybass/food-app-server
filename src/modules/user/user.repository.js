@@ -18,6 +18,9 @@ export const updateById = (id, data) =>
 export const deactivateById = (id) =>
   User.findByIdAndUpdate(id, { isActive: false }, { new: true });
 
+export const findByIdWithPassword = (id) =>
+  User.findById(id).select('+password');
+
 // ─── Address operations ──────────────────────────────────────────────────
 export const pushAddress = (userId, address) =>
   User.findByIdAndUpdate(

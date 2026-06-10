@@ -4,17 +4,29 @@ import bcrypt from "bcryptjs";
 // ─── Address Sub-Schema ──────────────────────────────────────────────────────
 const addressSchema = new mongoose.Schema(
   {
-    label: {
+    // FIX: renamed 'label' (enum) → 'type' to match the Address interface
+    type: {
       type: String,
       enum: ["home", "work", "other"],
       default: "home",
     },
-    street:     { type: String, required: [true, "Street is required"],      trim: true },
-    city:       { type: String, required: [true, "City is required"],        trim: true },
-    state:      { type: String, required: [true, "State is required"],       trim: true },
-    postalCode: { type: String, required: [true, "Postal code is required"], trim: true },
-    country:    { type: String, required: [true, "Country is required"],     trim: true, default: "India" },
-    isDefault:  { type: Boolean, default: false },
+    // FIX: added 'label' as a free-text display name (e.g. "My Home")
+    label: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    recipientName:  { type: String, trim: true, default: "" },
+    recipientPhone: { type: String, trim: true, default: "" },
+    street:    { type: String, required: [true, "Street is required"],      trim: true },
+    city:      { type: String, required: [true, "City is required"],        trim: true },
+    // FIX: state (atoll) is optional — not every Maldives address needs it
+    state:     { type: String, trim: true },
+    // FIX: renamed 'postalCode' → 'zip' to match the Address interface
+    zip:       { type: String, required: [true, "Postal code is required"], trim: true },
+    // FIX: removed stray trailing dot from "Maldives."
+    country:   { type: String, required: [true, "Country is required"],     trim: true, default: "Maldives" },
+    isDefault: { type: Boolean, default: false },
   },
   { _id: true }
 );
@@ -32,10 +44,10 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       required: function () {
-        return this.role === "user"; // ✅ only required for normal users
+        return this.role === "user";
       },
       unique: true,
-      sparse: true, // ✅ VERY IMPORTANT (allows multiple nulls)
+      sparse: true,
       trim: true,
       match: [/^\+?[1-9]\d{9,14}$/, "Please provide a valid phone number"],
     },
@@ -85,9 +97,9 @@ const userSchema = new mongoose.Schema(
     // },
     // emailVerificationToken:   { type: String, select: false },
     // emailVerificationExpires: { type: Date,   select: false },
-    passwordResetToken:       { type: String, select: false },
-    passwordResetExpires:     { type: Date,   select: false },
-    lastLogin:                { type: Date,   default: null },
+    passwordResetToken:   { type: String, select: false },
+    passwordResetExpires: { type: Date,   select: false },
+    lastLogin:            { type: Date,   default: null },
   },
   { timestamps: true }
 );
@@ -119,17 +131,18 @@ userSchema.methods.isAdmin = function () {
 
 userSchema.methods.toSafeObject = function () {
   return {
-    id:              this._id,
-    name:            this.name,
-    phone:           this.phone,
-    email:           this.email,
-    profilePic:      this.profilePic ?? null,
-    addresses:       this.addresses,
-    role:            this.role,
-    isActive:        this.isActive,
-    isEmailVerified: this.isEmailVerified,
-    lastLogin:       this.lastLogin,
-    createdAt:       this.createdAt,
+    id:         this._id,
+    name:       this.name,
+    phone:      this.phone,
+    email:      this.email,
+    profilePic: this.profilePic ?? null,
+    addresses:  this.addresses,
+    role:       this.role,
+    isActive:   this.isActive,
+    // FIX: removed isEmailVerified — field is commented out in schema,
+    //      referencing it returns undefined and misleads the client
+    lastLogin:  this.lastLogin,
+    createdAt:  this.createdAt,
   };
 };
 

@@ -1,8 +1,8 @@
 // modules/order/order.service.js
 import orderRepository from "./order.repository.js";
 import Counter         from "./counterModel.js";
-import Product         from "../product/product.model.js"; // adjust path
-import User            from "../user/user.model.js";        // adjust path
+import Product         from "../product/product.model.js";
+import User            from "../user/user.model.js";
 import {
   ORDER_STATUS,
   CANCELLED_BY,
@@ -15,7 +15,9 @@ import {
   NotFoundError,
   ForbiddenError,
   BadRequestError,
-} from "../../utils/apiError.js"; // adjust path
+} from "../../utils/apiError.js";
+import { isShopOpen, getDistanceKm } from "../shop/shop.service.js";
+import { STORE_LOCATION, MAX_DELIVERY_KM } from "../shop/shop.constants.js";
 
 // ── Generate order number: FSH0001, FSH0002... ────────────────────────────────
 const generateOrderNumber = async () => {
@@ -28,10 +30,41 @@ const pushTimeline = (order, status, changedBy, note = null) => {
   order.statusTimeline.push({ status, changedBy, note, at: new Date() });
 };
 
+// ── Helper: deduct variant stock ──────────────────────────────────────────────
+const deductStock = (items) =>
+  Promise.all(
+    items.map((item) =>
+      Product.findByIdAndUpdate(
+        item.product,
+        { $inc: { "variants.$[v].quantity": -item.quantity } },
+        { arrayFilters: [{ "v.unit": item.unit }] }
+      )
+    )
+  );
+
+// ── Helper: restore variant stock ────────────────────────────────────────────
+const restoreStock = (items) =>
+  Promise.all(
+    items.map((item) =>
+      Product.findByIdAndUpdate(
+        item.product,
+        { $inc: { "variants.$[v].quantity": item.quantity } },
+        { arrayFilters: [{ "v.unit": item.unit }] }
+      )
+    )
+  );
+
 class OrderService {
   // ── Place order ─────────────────────────────────────────────────────────────
   async placeOrder(userId, { items, addressId, shippingAddress }) {
-    // 1. Resolve shipping address
+    // ── 1. Block if shop is closed ────────────────────────────────────────────
+    if (!isShopOpen()) {
+      throw new BadRequestError(
+        "We are currently closed. Our delivery hours are 7:00 AM to 9:00 PM. Please try again during our working hours."
+      );
+    }
+
+    // ── 2. Resolve shipping address ───────────────────────────────────────────
     let resolvedAddress;
 
     if (shippingAddress) {
@@ -49,39 +82,78 @@ class OrderService {
       if (!address) throw new NotFoundError("Address");
 
       resolvedAddress = {
-        label:      address.label,
-        fullName:   user.name,
-        phone:      user.phone,
-        street:     address.street,
-        city:       address.city,
-        state:      address.state,
-        postalCode: address.postalCode,
-        country:    address.country,
+        label:         address.label         ?? "",
+        fullName:      user.name,
+        phone:         user.phone,
+        street:        address.street        ?? "",
+        city:          address.city          ?? "",
+        state:         address.state         ?? "",
+        zip:           address.zip           ?? "",
+        country:       address.country       ?? "Maldives",
+        location: {
+          latitude:  address.location?.latitude  ?? null,
+          longitude: address.location?.longitude ?? null,
+        },
+        locationLabel: address.locationLabel ?? "",
       };
+    }
+
+    // ── 30 km delivery radius check ───────────────────────────────────────────
+    const { latitude, longitude } = resolvedAddress.location ?? {};
+    if (latitude != null && longitude != null) {
+      const distanceKm = getDistanceKm(
+        STORE_LOCATION.latitude,
+        STORE_LOCATION.longitude,
+        latitude,
+        longitude
+      );
+      if (distanceKm > MAX_DELIVERY_KM) {
+        throw new BadRequestError(
+          `Sorry, we only deliver within ${MAX_DELIVERY_KM} km of our store. Your location is ${distanceKm.toFixed(1)} km away.`
+        );
+      }
     }
 
     // 2. Fetch + validate products
     const productIds = items.map((i) => i.product);
-    const products   = await Product.find({ _id: { $in: productIds }, isActive: true, isDeleted: false });
+    const products   = await Product.find({
+      _id:       { $in: productIds },
+      isActive:  true,
+      isDeleted: false,
+    });
     const productMap = new Map(products.map((p) => [p._id.toString(), p]));
 
     for (const item of items) {
       const product = productMap.get(item.product.toString());
       if (!product) throw new NotFoundError(`Product ${item.product}`);
-      if (product.quantity < item.quantity)
+
+      const variant = product.variants.find((v) => v.unit === item.unit);
+      if (!variant)
         throw new BadRequestError(
-          `Insufficient stock for "${product.name}". Available: ${product.quantity}, Requested: ${item.quantity}.`
+          `Variant "${item.unit}" not found for product "${product.name}".`
+        );
+      if (variant.quantity < item.quantity)
+        throw new BadRequestError(
+          `Insufficient stock for "${product.name}" (${item.unit}). Available: ${variant.quantity}, Requested: ${item.quantity}.`
         );
     }
 
-    // 3. Build resolved items
+    // 3. Build resolved items (snapshot name, unit, sku, price)
     const resolvedItems = items.map((item) => {
-      const p = productMap.get(item.product.toString());
-      return { product: p._id, name: p.name, price: p.price, quantity: item.quantity };
+      const p       = productMap.get(item.product.toString());
+      const variant = p.variants.find((v) => v.unit === item.unit);
+      return {
+        product:  p._id,
+        name:     p.name,
+        unit:     variant.unit,
+        sku:      variant.sku ?? null,
+        price:    variant.price,
+        quantity: item.quantity,
+      };
     });
 
-    const totalAmount   = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const orderNumber   = await generateOrderNumber();
+    const totalAmount = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const orderNumber = await generateOrderNumber();
 
     // 4. Create order with initial timeline entry
     const order = await orderRepository.create({
@@ -94,10 +166,8 @@ class OrderService {
       statusTimeline:  [{ status: ORDER_STATUS.PENDING, changedBy: userId, at: new Date() }],
     });
 
-    // 5. Deduct stock
-    await Promise.all(
-      items.map((item) => Product.findByIdAndUpdate(item.product, { $inc: { quantity: -item.quantity } }))
-    );
+    // 5. Deduct variant stock
+    await deductStock(resolvedItems);
 
     return order;
   }
@@ -199,13 +269,5 @@ class OrderService {
     return await orderRepository.save(order);
   }
 }
-
-// ── Helper: restore stock ──────────────────────────────────────────────────────
-const restoreStock = (items) =>
-  Promise.all(
-    items.map((item) =>
-      Product.findByIdAndUpdate(item.product, { $inc: { quantity: item.quantity } })
-    )
-  );
 
 export default new OrderService();

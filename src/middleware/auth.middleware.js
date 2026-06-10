@@ -60,6 +60,34 @@ export const restrictTo = (...allowedRoles) => (req, res, next) => {
   next();
 };
 
+// ─── optionalAuth — attaches user if valid token present, continues either way ─
+// Use this on public routes (e.g. product listing) where guests are allowed
+// but logged-in users can get personalised data.
+export const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      req.user = null;
+      return next(); // no token → continue as guest
+    }
+
+    const token = authHeader.split(" ")[1];
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      req.user = null;
+      return next(); // bad/expired token → continue as guest
+    }
+
+    const user = await repo.findById(decoded.id);
+    req.user = user?.isActive ? user : null;
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ─── Shorthand ───────────────────────────────────────
-export const adminOnly = restrictTo(ROLES.ADMIN, ROLES.SUPERADMIN);
+export const adminOnly      = restrictTo(ROLES.ADMIN, ROLES.SUPERADMIN);
 export const superAdminOnly = restrictTo(ROLES.SUPERADMIN);

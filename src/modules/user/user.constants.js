@@ -21,8 +21,10 @@ export const MESSAGES = {
   // Profile picture
   PROFILE_PIC_UPDATED: "Profile picture updated successfully",
   PROFILE_PIC_REMOVED: "Profile picture removed successfully",
+  PASSWORD_CHANGED: "Password changed successfully",
 
   // Address
+  ADDRESSES_FETCHED:   "Addresses fetched successfully",  // FIX: was missing, getAddresses used inline string
   ADDRESS_ADDED:       "Address added successfully",
   ADDRESS_UPDATED:     "Address updated successfully",
   ADDRESS_DELETED:     "Address deleted successfully",

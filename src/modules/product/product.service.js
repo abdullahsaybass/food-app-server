@@ -1,31 +1,55 @@
 import * as productRepository from "./product.repository.js";
-import { PRODUCT_MESSAGES, DEFAULT_PAGE, DEFAULT_LIMIT } from "./product.constants.js";
+
 import {
-  ConflictError,
+  PRODUCT_MESSAGES,
+  DEFAULT_PAGE,
+  DEFAULT_LIMIT,
+} from "./product.constants.js";
+
+import {
   NotFoundError,
-} from "../../utils/apiError.js"; 
+} from "../../utils/apiError.js";
 
-export const createProduct = async (data, userId) => {
-  const existing = await productRepository.findBySku(data.sku);
+// ─────────────────────────────────────────────
+// 🔥 CREATE PRODUCT
+// ─────────────────────────────────────────────
+export const createProduct = async (
+  data,
+  userId
+) => {
 
-  if (existing) {
-    throw new ConflictError(PRODUCT_MESSAGES.SKU_EXISTS);
-  }
+  return productRepository.create({
+    ...data,
+    createdBy: userId,
+  });
 
-  return productRepository.create({ ...data, createdBy: userId });
 };
 
-export const getProductById = async (id) => {
-  const product = await productRepository.findById(id);
+// ─────────────────────────────────────────────
+// 🔥 GET PRODUCT BY ID
+// ─────────────────────────────────────────────
+export const getProductById = async (
+  id
+) => {
+
+  const product =
+    await productRepository.findById(id);
 
   if (!product) {
     throw new NotFoundError("Product");
   }
 
   return product;
+
 };
 
-export const getAllProducts = async (query) => {
+// ─────────────────────────────────────────────
+// 🔥 GET ALL PRODUCTS
+// ─────────────────────────────────────────────
+export const getAllProducts = async (
+  query
+) => {
+
   const {
     page = DEFAULT_PAGE,
     limit = DEFAULT_LIMIT,
@@ -39,80 +63,153 @@ export const getAllProducts = async (query) => {
 
   const filter = {};
 
-  if (category) filter.category = category;
-  if (isActive !== undefined) filter.isActive = isActive;
-  if (search) filter.$text = { $search: search };
+  // CATEGORY
+  if (category) {
+    filter.category = category;
+  }
 
-  const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
+  // ACTIVE
+  if (isActive !== undefined) {
+    filter.isActive = isActive;
+  }
+
+  // SEARCH
+  if (search) {
+    filter.$text = {
+      $search: search,
+    };
+  }
+
+  // SORT
+  const sort = {
+    [sortBy]:
+      sortOrder === "asc" ? 1 : -1,
+  };
+
+  // PAGINATION
   const skip = (page - 1) * limit;
 
-  let { products, total } = await productRepository.findAll({
-    filter,
-    sort,
-    skip,
-    limit,
-  });
+  let { products, total } =
+    await productRepository.findAll({
+      filter,
+      sort,
+      skip,
+      limit,
+    });
 
+  // LOW STOCK FILTER
   if (lowStock) {
-    products = products.filter((p) => p.quantity <= p.stockThreshold);
+
+    products = products.filter((p) =>
+      p.variants.some(
+        (v) =>
+          v.quantity <=
+          v.stockThreshold
+      )
+    );
+
   }
 
   return {
     products,
+
     pagination: {
       page,
       limit,
       total,
-      totalPages: Math.ceil(total / limit),
+
+      totalPages: Math.ceil(
+        total / limit
+      ),
     },
   };
+
 };
 
-export const getLowStockProducts = async () => {
-  return productRepository.findLowStock();
+// ─────────────────────────────────────────────
+// 🔥 GET LOW STOCK PRODUCTS
+// ─────────────────────────────────────────────
+export const getLowStockProducts =
+  async () => {
+
+    return productRepository.findLowStock();
+
+  };
+
+// ─────────────────────────────────────────────
+// 🔥 UPDATE PRODUCT
+// ─────────────────────────────────────────────
+export const updateProduct = async (
+  id,
+  data,
+  userId
+) => {
+
+  const product =
+    await productRepository.updateById(
+      id,
+      {
+        ...data,
+        updatedBy: userId,
+      }
+    );
+
+  if (!product) {
+    throw new NotFoundError("Product");
+  }
+
+  return product;
+
 };
 
-export const updateProduct = async (id, data, userId) => {
-  if (data.sku) {
-    const existing = await productRepository.findBySku(data.sku);
+// ─────────────────────────────────────────────
+// 🔥 HARD DELETE PRODUCT
+// ─────────────────────────────────────────────
+export const deleteProduct = async (
+  id
+) => {
 
-    if (existing && existing._id.toString() !== id) {
-      throw new ConflictError(PRODUCT_MESSAGES.SKU_EXISTS);
+  const product =
+    await productRepository.deleteById(
+      id
+    );
+
+  if (!product) {
+    throw new NotFoundError("Product");
+  }
+
+  return product;
+
+};
+
+// ─────────────────────────────────────────────
+// 🔥 SOFT DELETE PRODUCT
+// ─────────────────────────────────────────────
+export const softDeleteProduct =
+  async (id, userId) => {
+
+    const product =
+      await productRepository.softDeleteById(
+        id,
+        userId
+      );
+
+    if (!product) {
+      throw new NotFoundError(
+        "Product"
+      );
     }
-  }
 
-  const product = await productRepository.updateById(id, {
-    ...data,
-    updatedBy: userId,
-  });
+    return product;
 
-  if (!product) {
-    throw new NotFoundError("Product");
-  }
+  };
 
-  return product;
-};
+// ─────────────────────────────────────────────
+// 🔥 GET CATEGORIES
+// ─────────────────────────────────────────────
+export const getCategories =
+  async () => {
 
-export const deleteProduct = async (id) => {
-  const product = await productRepository.deleteById(id);
+    return productRepository.findDistinctCategories();
 
-  if (!product) {
-    throw new NotFoundError("Product");
-  }
-
-  return product;
-};
-
-export const softDeleteProduct = async (id, userId) => {
-  const product = await productRepository.softDeleteById(id, userId);
-
-  if (!product) {
-    throw new NotFoundError("Product");
-  }
-
-  return product;
-};
-
-export const getCategories = async () => {
-  return productRepository.findDistinctCategories();
-};
+  };

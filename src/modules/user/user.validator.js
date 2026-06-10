@@ -1,5 +1,5 @@
 import Joi from "joi";
-import { Readable } from 'stream';
+import { Readable } from "stream";
 import cloudinary from "../../config/cloudinary.config.js";
 import { sharedSchemas } from "../auth/auth.validator.js";
 
@@ -18,29 +18,48 @@ const validate = (schema) => (req, res, next) => {
   next();
 };
 
-const addressBodySchema = Joi.object({
-  label:      Joi.string().valid("home", "work", "other").default("home"),
-  street:     Joi.string().trim().required().messages({ "any.required": "Street is required" }),
-  city:       Joi.string().trim().required().messages({ "any.required": "City is required" }),
-  state:      Joi.string().trim().required().messages({ "any.required": "State is required" }),
-  postalCode: Joi.string().trim().required().messages({ "any.required": "Postal code is required" }),
-  country:    Joi.string().trim().default("India"),
-  isDefault:  Joi.boolean().default(false),
+// ─── Add Address ──────────────────────────────────────────────────────────────
+export const addressBodySchema = Joi.object({
+  // FIX: renamed 'label' → 'type' (the enum category)
+  type:      Joi.string().valid("home", "work", "other").default("home"),
+  // FIX: added 'label' as optional free-text display name
+  label:     Joi.string().trim().allow("").default(""),
+  recipientName:  Joi.string().trim().allow("").default(""),
+  recipientPhone: Joi.string().trim().pattern(/^\+?[1-9]\d{9,14}$/).allow("").default(""),
+  street:    Joi.string().trim().required().messages({ "any.required": "Street is required" }),
+  city:      Joi.string().trim().required().messages({ "any.required": "City is required" }),
+  // FIX: state (atoll) is optional for Maldives
+  state:     Joi.string().trim().allow("", null).optional(),
+  // FIX: renamed 'postalCode' → 'zip'
+  zip:       Joi.string().trim().required().messages({ "any.required": "Postal code is required" }),
+  // FIX: default country changed from "India" → "Maldives"
+  country: Joi.string()
+  .valid('Maldives', 'MV')
+  .default('Maldives')
 });
 
+// ─── Update Address ───────────────────────────────────────────────────────────
+export const updateAddressSchema = Joi.object({
+  // FIX: renamed 'label' → 'type'
+  type:      Joi.string().valid("home", "work", "other"),
+  // FIX: added optional label update
+  label:     Joi.string().trim().allow(""),
+  recipientName:  Joi.string().trim().allow(""),
+  recipientPhone: Joi.string().trim().pattern(/^\+?[1-9]\d{9,14}$/).allow(""),
+  street:    Joi.string().trim(),
+  city:      Joi.string().trim(),
+  // FIX: state optional
+  state:     Joi.string().trim().allow("", null),
+  // FIX: renamed 'postalCode' → 'zip'
+  zip:       Joi.string().trim(),
+  country:   Joi.string().trim(),
+  isDefault: Joi.boolean(),
+}).min(1);
+
+// ─── Other profile schemas (unchanged) ───────────────────────────────────────
 const updateProfileSchema = Joi.object({
   name:  Joi.string().min(2).max(50),
   phone: Joi.string().pattern(/^\+?[1-9]\d{9,14}$/),
-}).min(1);
-
-const updateAddressSchema = Joi.object({
-  label:      Joi.string().valid("home", "work", "other"),
-  street:     Joi.string().trim(),
-  city:       Joi.string().trim(),
-  state:      Joi.string().trim(),
-  postalCode: Joi.string().trim(),
-  country:    Joi.string().trim(),
-  isDefault:  Joi.boolean(),
 }).min(1);
 
 const adminUpdateUserSchema = Joi.object({
@@ -50,20 +69,18 @@ const adminUpdateUserSchema = Joi.object({
   isActive: Joi.boolean(),
 }).min(1);
 
-// ✅ REPLACED — uploads to cloudinary instead of validating req.body
+// ─── Profile picture upload (cloudinary) ─────────────────────────────────────
 export const validateUpdateProfilePic = async (req, res, next) => {
   try {
-    console.log('🔥 req.file:', req.file); // ✅ ADD THIS
-    
     if (!req.file) {
-      return res.status(400).json({ success: false, errors: ['No file uploaded'] });
+      return res.status(400).json({ success: false, errors: ["No file uploaded"] });
     }
 
     const uploadResult = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         {
-          folder:         'profile_pics',
-          transformation: [{ width: 400, height: 400, crop: 'fill' }],
+          folder:         "profile_pics",
+          transformation: [{ width: 400, height: 400, crop: "fill" }],
         },
         (error, result) => (error ? reject(error) : resolve(result))
       );
@@ -77,12 +94,23 @@ export const validateUpdateProfilePic = async (req, res, next) => {
 
     next();
   } catch (err) {
-    console.log('❌ cloudinary error:', err); // ✅ ADD THIS
     next(err);
   }
 };
+
+
+const changePasswordSchema = Joi.object({
+  currentPassword: Joi.string().required().messages({
+    "any.required": "Current password is required",
+  }),
+  newPassword: Joi.string().min(8).required().messages({
+    "string.min":   "New password must be at least 8 characters",
+    "any.required": "New password is required",
+  }),
+});
 
 export const validateUpdateProfile   = validate(updateProfileSchema);
 export const validateAddAddress      = validate(addressBodySchema);
 export const validateUpdateAddress   = validate(updateAddressSchema);
 export const validateAdminUpdateUser = validate(adminUpdateUserSchema);
+export const validateChangePassword  = validate(changePasswordSchema);

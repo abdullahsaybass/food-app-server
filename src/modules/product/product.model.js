@@ -1,150 +1,430 @@
 import mongoose from "mongoose";
-import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from "./product.constants.js";
+import slugify from "slugify";
 
-const productSchema = new mongoose.Schema(
+import {
+  PRODUCT_CATEGORIES,
+  PRODUCT_UNITS,
+} from "./product.constants.js";
+
+// ─────────────────────────────────────────────
+// 🔥 VARIANT SCHEMA
+// ─────────────────────────────────────────────
+const variantSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    description: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-
-    // 🔥 SKU (auto-generated if not provided)
-    sku: {
-      type: String,
-      unique: true,
-      uppercase: true,
-      trim: true,
-    },
-
-    // 🔥 SEO slug
-    slug: {
-      type: String,
-      unique: true,
-    },
-
-    // 🔥 Price (safe decimals)
-    price: {
-      type: Number,
-      required: true,
-      min: 0,
-      set: (v) => Math.round(v * 100) / 100,
-    },
-
-    // 🔥 Stock
-    quantity: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 0,
-    },
-
     unit: {
       type: String,
       enum: Object.values(PRODUCT_UNITS),
       required: true,
     },
 
-    category: {
-      type: String,
-      enum: Object.values(PRODUCT_CATEGORIES),
+    price: {
+      type: Number,
       required: true,
+      min: 0,
+
+      set: (v) =>
+        Math.round(v * 100) / 100,
     },
 
-    // 🔥 Images (Cloudinary ready)
-    images: [
-      {
-        url: { type: String, required: true },
-        publicId: { type: String },
-        altText: { type: String, default: "" },
-      },
-    ],
+    quantity: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+        weight: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
 
-    // 🔥 Stock alert
+    weightUnit: {
+      type: String,
+      enum: ["kg", "g", "ml", "L"],
+      default: "kg",
+    },
+
+    piecesCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    packetQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    caseQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+   
+
+    // SKU
+    sku: {
+      type: String,
+      uppercase: true,
+      trim: true,
+    },
+
+    // Wholesale
+    minOrderQuantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    bulkPrice: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
     stockThreshold: {
       type: Number,
       default: 10,
       min: 0,
     },
-
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-
-    // 🔥 Soft delete (future safe)
-    isDeleted: {
-      type: Boolean,
-      default: false,
-    },
-
-    // 🔥 Audit fields
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
-    updatedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
   },
   {
-    timestamps: true,
-    versionKey: false,
+    _id: false,
   }
 );
 
+// ─────────────────────────────────────────────
+// 🔥 PRODUCT SCHEMA
+// ─────────────────────────────────────────────
+const productSchema =
+  new mongoose.Schema(
+    {
+      // BASIC INFO
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+
+      slug: {
+        type: String,
+        unique: true,
+        index: true,
+      },
+
+      description: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+
+      category: {
+        type: String,
+        enum: Object.values(
+          PRODUCT_CATEGORIES
+        ),
+        required: true,
+        index: true,
+      },
+
+      tags: [
+        {
+          type: String,
+          trim: true,
+          lowercase: true,
+        },
+      ],
+
+      // VARIANTS
+      variants: {
+        type: [variantSchema],
+
+        validate: {
+          validator: (v) =>
+            v.length > 0,
+
+          message:
+            "At least one variant is required",
+        },
+      },
+
+      // IMAGES
+      images: [
+        {
+          url: {
+            type: String,
+            required: true,
+          },
+
+          publicId: {
+            type: String,
+          },
+
+          altText: {
+            type: String,
+            default: "",
+          },
+        },
+      ],
+
+      // STATUS
+      featured: {
+        type: Boolean,
+        default: false,
+      },
+
+      isActive: {
+        type: Boolean,
+        default: true,
+        index: true,
+      },
+
+      isDeleted: {
+        type: Boolean,
+        default: false,
+        index: true,
+      },
+
+      // DISCOUNT
+      discountPercentage: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100,
+      },
+
+      
+           // PRODUCT INFO
+      shortDescription: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+
+      brand: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+
+      quality: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+
+      countryOrigin: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+
+      storageInstruction: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+
+      usageInstruction: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+
+      // PRODUCT FLAGS
+      halal: {
+        type: Boolean,
+        default: false,
+      },
+
+      frozen: {
+        type: Boolean,
+        default: false,
+      },
+
+      fresh: {
+        type: Boolean,
+        default: false,
+      },
+
+      bestSeller: {
+        type: Boolean,
+        default: false,
+      },
+
+      newArrival: {
+        type: Boolean,
+        default: false,
+      },
+
+      // ANALYTICS
+      rating: {
+        type: Number,
+        default: 0,
+      },
+
+      totalReviews: {
+        type: Number,
+        default: 0,
+      },
+
+      totalSold: {
+        type: Number,
+        default: 0,
+      },
+
+      totalViews: {
+        type: Number,
+        default: 0,
+      },
+
+      // AUDIT
+      createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+
+      updatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    },
+    {
+      timestamps: true,
+      versionKey: false,
+    }
+  );
 
 // ─────────────────────────────────────────────
-// 🔥 AUTO GENERATE SKU + SLUG
+// 🔥 AUTO GENERATE SLUG + SKU
 // ─────────────────────────────────────────────
-productSchema.pre("validate", function () {
-  // SKU
-  if (!this.sku) {
-    const namePart = this.name.replace(/\s+/g, "-").toUpperCase();
-    const unitPart = this.unit.toUpperCase();
+productSchema.pre(
+  "validate",
+  function () {
 
-    this.sku = `${namePart}-${unitPart}`;
-  }
+    // SLUG
+    if (!this.slug) {
 
-  // SLUG
-  if (!this.slug) {
-    this.slug = this.name.toLowerCase().replace(/\s+/g, "-");
+      this.slug =
+        slugify(this.name, {
+          lower: true,
+          strict: true,
+        }) +
+        "-" +
+        Date.now();
+
+    }
+
+    // VARIANT SKU
+    this.variants.forEach(
+      (variant) => {
+
+        if (!variant.sku) {
+
+          variant.sku =
+            `${slugify(this.name, {
+              upper: true,
+              strict: true,
+            })}-${variant.unit.toUpperCase()}-${Date.now()}-${Math.floor(
+              Math.random() * 1000
+            )}`;
+
+        }
+
+      }
+    );
+
   }
+);
+
+// ─────────────────────────────────────────────
+// 🔥 VIRTUALS
+// ─────────────────────────────────────────────
+
+// TOTAL STOCK
+productSchema.virtual(
+  "totalStock"
+).get(function () {
+
+  return this.variants.reduce(
+    (total, variant) =>
+      total + variant.quantity,
+    0
+  );
+
 });
 
+// LOW STOCK
+productSchema.virtual(
+  "lowStockVariants"
+).get(function () {
 
-// ─────────────────────────────────────────────
-// 🔥 VIRTUAL FIELD
-// ─────────────────────────────────────────────
-productSchema.virtual("isLowStock").get(function () {
-  return this.quantity <= this.stockThreshold;
+  return this.variants.filter(
+    (variant) =>
+      variant.quantity <=
+      variant.stockThreshold
+  );
+
 });
 
-productSchema.set("toJSON", { virtuals: true });
-productSchema.set("toObject", { virtuals: true });
+// IN STOCK
+productSchema.virtual(
+  "inStock"
+).get(function () {
 
+  return this.totalStock > 0;
+
+});
+
+productSchema.set("toJSON", {
+  virtuals: true,
+});
+
+productSchema.set("toObject", {
+  virtuals: true,
+});
 
 // ─────────────────────────────────────────────
-// 🔥 INDEXES (NO DUPLICATES)
+// 🔥 INDEXES
 // ─────────────────────────────────────────────
-productSchema.index({ category: 1 });
-productSchema.index({ isActive: 1 });
-productSchema.index({ quantity: 1 });
-productSchema.index({ name: "text", description: "text" });
 
+// SEARCH
+productSchema.index({
+  name: "text",
+  description: "text",
+  tags: "text",
+});
+
+// FILTERING
+productSchema.index({
+  category: 1,
+  isActive: 1,
+});
+
+// FEATURED
+productSchema.index({
+  featured: 1,
+});
+
+// SUPPLIER
+productSchema.index({
+  supplier: 1,
+});
+
+// VARIANT SKU
+productSchema.index({
+  "variants.sku": 1,
+});
 
 // ─────────────────────────────────────────────
 // 🔥 EXPORT
 // ─────────────────────────────────────────────
-const Product = mongoose.model("Product", productSchema);
+const Product = mongoose.model(
+  "Product",
+  productSchema
+);
 
 export default Product;

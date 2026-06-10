@@ -9,6 +9,11 @@ const cartItemSchema = new mongoose.Schema(
       ref:      'Product',
       required: true,
     },
+    // Which variant the user selected (e.g. "1kg", "500g")
+    unit: {
+      type:     String,
+      required: true,
+    },
     quantity: {
       type:     Number,
       required: true,
@@ -16,7 +21,7 @@ const cartItemSchema = new mongoose.Schema(
       default:  1,
     },
     price: {
-      type:     Number, // price snapshot at time of adding
+      type:     Number, // variant price snapshot at time of adding
       required: true,
     },
   },

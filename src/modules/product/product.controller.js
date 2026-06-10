@@ -3,48 +3,63 @@ import { toProductDTO, toProductListDTO, toCategoryDTO } from './product.mapper.
 import { PRODUCT_MESSAGES } from "./product.constants.js";
 import asyncHandler from "../../utils/asyncHandler.js";
 
-export const createProduct = async (req, res) => {
+export const createProduct = async (
+  req,
+  res
+) => {
   try {
 
-    console.log("REQ BODY:");
-    console.log(req.body);
-
-    console.log("USER:");
-    console.log(req.user);
-
-    const product = await productService.createProduct(
-      req.body,
-      req.user.id
+    console.log(
+      "REQ BODY:",
+      req.body
     );
+
+    console.log(
+      "USER:",
+      req.user
+    );
+
+    const product =
+      await productService.createProduct(
+        req.body,
+        req.user.id
+      );
 
     return res.status(201).json({
       success: true,
-      message: PRODUCT_MESSAGES.CREATED,
-      data: toProductDTO(product),
+
+      message:
+        PRODUCT_MESSAGES.CREATED,
+
+      data:
+        toProductDTO(product),
     });
 
   } catch (err) {
 
-    console.log("========== ERROR ==========");
-    console.log(err);
-
-    console.log("========== MESSAGE ==========");
-    console.log(err.message);
-
-    console.log("========== ERRORS ==========");
-    console.log(err.errors);
-
-    console.log("========== STACK ==========");
-    console.log(err.stack);
+    console.error(
+      "CREATE PRODUCT ERROR:",
+      err
+    );
 
     return res.status(400).json({
       success: false,
-      message: err.message,
-      errors: err.errors,
+
+      message:
+        err.message ||
+        "Failed to create product",
+
+      errors:
+        err.errors || [],
+
+      stack:
+        process.env.NODE_ENV ===
+        "development"
+          ? err.stack
+          : undefined,
     });
   }
 };
-
 export const getProduct = asyncHandler(async (req, res) => {
   const product = await productService.getProductById(req.params.id);
 

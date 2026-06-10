@@ -140,3 +140,29 @@ export const seedAdmin = async (data) => {
 
   return { user };
 };
+
+export const getAddresses = async (userId) => {
+  const user = await repo.findById(userId);
+
+  if (!user) {
+    return {
+      notFound: true,
+      message: MESSAGES.USER_NOT_FOUND,
+    };
+  }
+
+  return {
+    addresses: user.addresses || [],
+  };
+};
+export const changePassword = async (userId, { currentPassword, newPassword }) => {
+  const user = await repo.findByIdWithPassword(userId);
+  if (!user) return { notFound: true, message: MESSAGES.USER_NOT_FOUND };
+
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) return { unauthorized: true, message: "Current password is incorrect" };
+
+  user.password = newPassword;
+  await user.save();
+  return { success: true };
+};

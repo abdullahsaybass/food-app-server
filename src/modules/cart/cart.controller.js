@@ -1,9 +1,9 @@
 // src/features/cart/cart.controller.js
 
-import * as cartService                from './cart.service.js';
-import { toCartDTO, emptyCartDTO }     from './cart.mapper.js';
-import { CART_MESSAGES, CART_ERRORS }  from './cart.constants.js';
-import asyncHandler                    from '../../utils/asyncHandler.js';
+import * as cartService               from './cart.service.js';
+import { toCartDTO, emptyCartDTO }    from './cart.mapper.js';
+import { CART_MESSAGES, CART_ERRORS } from './cart.constants.js';
+import asyncHandler                   from '../../utils/asyncHandler.js';
 
 // ── GET /api/cart ─────────────────────────────────────────────────────────────
 export const getCart = asyncHandler(async (req, res) => {
@@ -27,8 +27,8 @@ export const syncCart = asyncHandler(async (req, res) => {
 
 // ── POST /api/cart/items ──────────────────────────────────────────────────────
 export const addItem = asyncHandler(async (req, res) => {
-  const { productId, quantity = 1 } = req.body;
-  const cart = await cartService.addItem(req.user.id, productId, quantity);
+  const { productId, unit, quantity = 1 } = req.body;
+  const cart = await cartService.addItem(req.user.id, productId, unit, quantity);
   res.status(200).json({
     success: true,
     message: CART_MESSAGES.ITEM_ADDED,
@@ -36,13 +36,13 @@ export const addItem = asyncHandler(async (req, res) => {
   });
 });
 
-// ── PATCH /api/cart/items/:productId ─────────────────────────────────────────
+// ── PATCH /api/cart/items/:productId/:unit ────────────────────────────────────
 export const updateItem = asyncHandler(async (req, res) => {
-  const { productId } = req.params;
-  const { quantity }  = req.body;
+  const { productId, unit } = req.params;
+  const { quantity }        = req.body;
 
   try {
-    const cart = await cartService.updateItem(req.user.id, productId, quantity);
+    const cart = await cartService.updateItem(req.user.id, productId, unit, quantity);
     res.status(200).json({
       success: true,
       message: CART_MESSAGES.ITEM_UPDATED,
@@ -58,12 +58,12 @@ export const updateItem = asyncHandler(async (req, res) => {
   }
 });
 
-// ── DELETE /api/cart/items/:productId ────────────────────────────────────────
+// ── DELETE /api/cart/items/:productId/:unit ───────────────────────────────────
 export const removeItem = asyncHandler(async (req, res) => {
-  const { productId } = req.params;
+  const { productId, unit } = req.params;
 
   try {
-    const cart = await cartService.removeItem(req.user.id, productId);
+    const cart = await cartService.removeItem(req.user.id, productId, unit);
     res.status(200).json({
       success: true,
       message: CART_MESSAGES.ITEM_REMOVED,

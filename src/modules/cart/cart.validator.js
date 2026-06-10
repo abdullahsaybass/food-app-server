@@ -15,13 +15,14 @@ const validate = (schema) => (req, res, next) => {
 };
 
 // POST /api/cart/sync
-// Body: { items: [{ productId, quantity }] }
+// Body: { items: [{ productId, unit, quantity }] }
 export const validateSyncCart = validate(
   Joi.object({
     items: Joi.array()
       .items(
         Joi.object({
           productId: Joi.string().required(),
+          unit:      Joi.string().required(),
           quantity:  Joi.number().integer().min(1).required(),
         })
       )
@@ -30,15 +31,16 @@ export const validateSyncCart = validate(
 );
 
 // POST /api/cart/items
-// Body: { productId, quantity }
+// Body: { productId, unit, quantity }
 export const validateAddItem = validate(
   Joi.object({
     productId: Joi.string().required(),
+    unit:      Joi.string().required(),
     quantity:  Joi.number().integer().min(1).default(1),
   })
 );
 
-// PATCH /api/cart/items/:productId
+// PATCH /api/cart/items/:productId/:unit
 // Body: { quantity }
 export const validateUpdateItem = validate(
   Joi.object({
