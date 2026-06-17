@@ -18,14 +18,21 @@ const addressSchema = new mongoose.Schema(
     },
     recipientName:  { type: String, trim: true, default: "" },
     recipientPhone: { type: String, trim: true, default: "" },
-    street:    { type: String, required: [true, "Street is required"],      trim: true },
-    city:      { type: String, required: [true, "City is required"],        trim: true },
-    // FIX: state (atoll) is optional — not every Maldives address needs it
+    street:    { type: String, required: [true, "Street is required"], trim: true },
+    atoll:     { type: String, trim: true, default: "" }, // required enforced by Joi only
+    island:    { type: String, trim: true, default: "" }, // required enforced by Joi only
+    // city is kept for backwards-compat and derived as "<island>, <atoll>"
+    city:      { type: String, trim: true },
     state:     { type: String, trim: true },
-    // FIX: renamed 'postalCode' → 'zip' to match the Address interface
-    zip:       { type: String, required: [true, "Postal code is required"], trim: true },
+    zip:       { type: String, trim: true, default: "" }, // required enforced by Joi only
     // FIX: removed stray trailing dot from "Maldives."
     country:   { type: String, required: [true, "Country is required"],     trim: true, default: "Maldives" },
+    // GPS coordinates — used for Maldives-only delivery validation
+    location: {
+      latitude:  { type: Number, default: null },
+      longitude: { type: Number, default: null },
+    },
+    locationLabel: { type: String, trim: true, default: "" },
     isDefault: { type: Boolean, default: false },
   },
   { _id: true }
@@ -49,7 +56,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
       trim: true,
-      match: [/^\+?[1-9]\d{9,14}$/, "Please provide a valid phone number"],
+      
     },
     email: {
       type: String,

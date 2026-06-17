@@ -3,6 +3,9 @@ import orderRepository from "./order.repository.js";
 import Counter         from "./counterModel.js";
 import Product         from "../product/product.model.js";
 import User            from "../user/user.model.js";
+import notificationService from "../../services/notification/notification.service.js";
+import deliveryZoneService from "../delivery/deliveryzone.service.js";
+import { isMaldivesAddress } from "../../utils/geo.utils.js";
 import {
   ORDER_STATUS,
   CANCELLED_BY,
@@ -10,14 +13,13 @@ import {
   ADMIN_STATUS_TRANSITIONS,
   ORDER_MESSAGES,
   ORDER_NUMBER_PREFIX,
+  DELIVERY_WINDOW_HOURS,
 } from "./order.constants.js";
 import {
   NotFoundError,
   ForbiddenError,
   BadRequestError,
 } from "../../utils/apiError.js";
-import { isShopOpen, getDistanceKm } from "../shop/shop.service.js";
-import { STORE_LOCATION, MAX_DELIVERY_KM } from "../shop/shop.constants.js";
 
 // ── Generate order number: FSH0001, FSH0002... ────────────────────────────────
 const generateOrderNumber = async () => {
@@ -28,6 +30,13 @@ const generateOrderNumber = async () => {
 // ── Push to status timeline ───────────────────────────────────────────────────
 const pushTimeline = (order, status, changedBy, note = null) => {
   order.statusTimeline.push({ status, changedBy, note, at: new Date() });
+};
+
+// ── Same-day delivery estimate ────────────────────────────────────────────────
+const calculateEstimatedDelivery = () => {
+  const eta = new Date();
+  eta.setHours(eta.getHours() + DELIVERY_WINDOW_HOURS);
+  return eta;
 };
 
 // ── Helper: deduct variant stock ──────────────────────────────────────────────
@@ -57,14 +66,7 @@ const restoreStock = (items) =>
 class OrderService {
   // ── Place order ─────────────────────────────────────────────────────────────
   async placeOrder(userId, { items, addressId, shippingAddress }) {
-    // ── 1. Block if shop is closed ────────────────────────────────────────────
-    if (!isShopOpen()) {
-      throw new BadRequestError(
-        "We are currently closed. Our delivery hours are 7:00 AM to 9:00 PM. Please try again during our working hours."
-      );
-    }
-
-    // ── 2. Resolve shipping address ───────────────────────────────────────────
+    // ── 1. Resolve shipping address ───────────────────────────────────────────
     let resolvedAddress;
 
     if (shippingAddress) {
@@ -98,20 +100,9 @@ class OrderService {
       };
     }
 
-    // ── 30 km delivery radius check ───────────────────────────────────────────
-    const { latitude, longitude } = resolvedAddress.location ?? {};
-    if (latitude != null && longitude != null) {
-      const distanceKm = getDistanceKm(
-        STORE_LOCATION.latitude,
-        STORE_LOCATION.longitude,
-        latitude,
-        longitude
-      );
-      if (distanceKm > MAX_DELIVERY_KM) {
-        throw new BadRequestError(
-          `Sorry, we only deliver within ${MAX_DELIVERY_KM} km of our store. Your location is ${distanceKm.toFixed(1)} km away.`
-        );
-      }
+    // ── 1b. Maldives-only delivery check ───────────────────────────────────────
+    if (!isMaldivesAddress(resolvedAddress)) {
+      throw new BadRequestError(ORDER_MESSAGES.OUTSIDE_MALDIVES);
     }
 
     // 2. Fetch + validate products
@@ -152,8 +143,17 @@ class OrderService {
       };
     });
 
-    const totalAmount = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const itemsTotal  = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+    // Resolve delivery charge based on city + atoll of the shipping address
+    const deliveryCharge = await deliveryZoneService.resolveCharge({
+      city:  resolvedAddress.city  || null,
+      atoll: resolvedAddress.state || null,
+    });
+
+    const totalAmount = itemsTotal + deliveryCharge;
     const orderNumber = await generateOrderNumber();
+    const estimatedDeliveryAt = calculateEstimatedDelivery();
 
     // 4. Create order with initial timeline entry
     const order = await orderRepository.create({
@@ -162,12 +162,17 @@ class OrderService {
       items:           resolvedItems,
       shippingAddress: resolvedAddress,
       paymentMethod:   "cod",
+      deliveryCharge,
       totalAmount,
+      estimatedDeliveryAt,
       statusTimeline:  [{ status: ORDER_STATUS.PENDING, changedBy: userId, at: new Date() }],
     });
 
     // 5. Deduct variant stock
     await deductStock(resolvedItems);
+
+    // 6. Notify user: order placed
+    await notificationService.sendOrderStatusNotification(userId, order, ORDER_STATUS.PENDING);
 
     return order;
   }
@@ -221,7 +226,11 @@ class OrderService {
     pushTimeline(order, ORDER_STATUS.CANCELLED, userId, cancelReason || null);
 
     await restoreStock(order.items);
-    return await orderRepository.save(order);
+    const saved = await orderRepository.save(order);
+
+    await notificationService.sendOrderStatusNotification(order.user, saved, ORDER_STATUS.CANCELLED);
+
+    return saved;
   }
 
   // ── Admin: cancel order ───────────────────────────────────────────────────────
@@ -241,10 +250,16 @@ class OrderService {
     pushTimeline(order, ORDER_STATUS.CANCELLED, adminId, cancelReason || null);
 
     await restoreStock(order.items);
-    return await orderRepository.save(order);
+    const saved = await orderRepository.save(order);
+
+    await notificationService.sendOrderStatusNotification(order.user, saved, ORDER_STATUS.CANCELLED);
+
+    return saved;
   }
 
   // ── Admin: update status ──────────────────────────────────────────────────────
+  // Flow: pending (Order Placed) -> confirmed (Confirmation) -> processing
+  //       -> shipped (On the Way) -> delivered
   async updateOrderStatus(orderId, newStatus, adminId) {
     const order = await orderRepository.findByIdRaw(orderId);
     if (!order) throw new NotFoundError("Order");
@@ -266,7 +281,12 @@ class OrderService {
     order.status = newStatus;
     Object.assign(order, extra);
 
-    return await orderRepository.save(order);
+    const saved = await orderRepository.save(order);
+
+    // ── Notify the customer about every status change ────────────────────────────
+    await notificationService.sendOrderStatusNotification(order.user, saved, newStatus);
+
+    return saved;
   }
 }
 

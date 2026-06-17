@@ -1,58 +1,12 @@
-export const PRODUCT_CATEGORIES = {
-  FROZEN: "frozen",
-
-  CHICKEN: "chicken",
-
-  BEEF: "beef",
-
-  MUTTON: "mutton",
-
-  SEAFOOD: "seafood",
-
-  DAIRY: "dairy",
-
-  NUTS: "nuts",
-
-  DALS: "dals",
-
-  SEEDS: "seeds",
-
-  SPICES: "spices",
-
-  POWDERS: "powders",
-
-  SNACKS: "snacks",
-
-  GRAINS: "grains",
-
-  BEVERAGES: "beverages",
-
-  VEGETABLES: "vegetables",
-
-  FRUITS: "fruits",
-
-  OTHER: "other",
-};
+// NOTE: PRODUCT_CATEGORIES (a fixed string enum: frozen, chicken, beef, ...)
+// used to live here, but categories are now a dynamic, admin-managed
+// collection (see modules/category/*) referenced by product.category as an
+// ObjectId — not a fixed enum. Removed to avoid confusion; nothing imported it.
 
 export const PRODUCT_UNITS = {
 
-  // SMALL WEIGHTS
-  G100: "100g",
-
-  G250: "250g",
-
-  G500: "500g",
-
-  // KG VARIANTS
-  KG1: "1kg",
-
-  KG2: "2kg",
-
-  KG5: "5kg",
-
-  KG10: "10kg",
-
-  // GENERIC
+  // WEIGHT / VOLUME (pair with weight + weightUnit for the actual amount,
+  // e.g. unit: "kg", weight: 1, weightUnit: "kg" → "1kg")
   KG: "kg",
 
   GRAMS: "g",

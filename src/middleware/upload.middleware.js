@@ -21,11 +21,11 @@ export const upload = multer({
 });
 
 // ── Upload a single buffer → Cloudinary via stream ──
-const uploadToCloudinary = (buffer) => {
+const uploadToCloudinary = (buffer, folder = 'grocify/products') => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: 'grocify/products',
+        folder,
         resource_type: 'image',
         transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto' }],
       },
@@ -40,12 +40,15 @@ const uploadToCloudinary = (buffer) => {
 
 // ── Middleware: streams all req.files buffers → Cloudinary ──
 // Attaches req.cloudinaryImages = [{ url, publicId, altText }]
+// Optionally set req.uploadFolder before this middleware to target a different Cloudinary folder.
 export const uploadToCloud = async (req, res, next) => {
   if (!req.files || req.files.length === 0) return next();
 
   try {
+    const folder = req.uploadFolder || 'grocify/products';
+
     const uploaded = await Promise.all(
-      req.files.map((file) => uploadToCloudinary(file.buffer))
+      req.files.map((file) => uploadToCloudinary(file.buffer, folder))
     );
 
     req.cloudinaryImages = uploaded.map((result) => ({

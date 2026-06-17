@@ -1,7 +1,8 @@
 // modules/order/order.validator.js
 import Joi from "joi";
 import { ValidationError } from "../../utils/apiError.js";
-import { ORDER_STATUS, PAYMENT_STATUS } from "./order.constants.js";
+import { ORDER_STATUS, PAYMENT_STATUS, ORDER_MESSAGES } from "./order.constants.js";
+import { isMaldivesAddress } from "../../utils/geo.utils.js";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 const orderItemSchema = Joi.object({
@@ -28,14 +29,27 @@ const shippingAddressSchema = Joi.object({
   city:          Joi.string().trim().allow("").default(""),
   state:         Joi.string().trim().allow("").default(""),
   zip:           Joi.string().trim().allow("").default(""),
-  country:       Joi.string().trim().max(100).default("Maldives"),
-  // GPS coords for 30 km radius check
+
+  // ── Maldives-only — country must be Maldives / MV ──────────────────────────
+  country: Joi.string().trim().valid("Maldives", "MV").default("Maldives").messages({
+    "any.only": ORDER_MESSAGES.OUTSIDE_MALDIVES,
+  }),
+
+  // GPS coords for Maldives bounding-box check
   location: Joi.object({
     latitude:  Joi.number().min(-90).max(90).allow(null).default(null),
     longitude: Joi.number().min(-180).max(180).allow(null).default(null),
   }).default({ latitude: null, longitude: null }),
   locationLabel: Joi.string().trim().allow("").default(""),
-});
+})
+  // ── Custom check: if GPS is provided, it must fall inside Maldives ─────────
+  .custom((value, helpers) => {
+    if (!isMaldivesAddress(value)) {
+      return helpers.error("any.invalid");
+    }
+    return value;
+  })
+  .messages({ "any.invalid": ORDER_MESSAGES.OUTSIDE_MALDIVES });
 
 const placeOrderSchema = Joi.object({
   items: Joi.array().items(orderItemSchema).min(1).required().messages({

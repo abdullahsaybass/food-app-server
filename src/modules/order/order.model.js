@@ -23,8 +23,9 @@ const shippingAddressSchema = new mongoose.Schema(
     city:          { type: String, trim: true, default: "" },
     state:         { type: String, trim: true, default: "" },
     zip:           { type: String, trim: true, default: "" },
+    // Maldives-only — enforced in order.validator.js + order.service.js
     country:       { type: String, trim: true, default: "Maldives" },
-    // GPS coords — used for 30 km delivery radius check
+    // GPS coords — used for the Maldives bounding-box check
     location: {
       latitude:  { type: Number, default: null },
       longitude: { type: Number, default: null },
@@ -69,6 +70,10 @@ const orderSchema = new mongoose.Schema(
       index:   true,
     },
 
+    // ── Same-day delivery estimate (grocery: delivered within hours) ────────────
+    estimatedDeliveryAt: { type: Date, default: null },
+    deliveredAt:         { type: Date, default: null },
+
     // ── Timeline: every status change logged ───────────────────────────────────
     statusTimeline: { type: [statusTimelineSchema], default: [] },
 
@@ -89,6 +94,10 @@ orderSchema.index({ "shippingAddress.fullName": "text", orderNumber: "text" });
 orderSchema.pre("save", function () {
   if (this.isModified("status")) {
     this.statusUpdatedAt = new Date();
+
+    if (this.status === ORDER_STATUS.DELIVERED && !this.deliveredAt) {
+      this.deliveredAt = new Date();
+    }
   }
 });
 

@@ -31,13 +31,14 @@ export const toAddressList = (addresses) =>
     type:      a.type,       // FIX: was a.label (the enum)
     label:     a.label,  
     recipientName:  a.recipientName  ?? "",
-    recipientPhone: a.recipientPhone ?? "",    // FIX: new free-text display name field
+    recipientPhone: a.recipientPhone ?? "",
     street:    a.street,
-    city:      a.city,
+    atoll:     a.atoll,
+    island:    a.island,
+    city:      a.city ?? `${a.island}, ${a.atoll}`,
     state:     a.state,
     zip:       a.zip,        // FIX: was a.postalCode
     country:   a.country,
     isDefault: a.isDefault,
     
   }));
- 

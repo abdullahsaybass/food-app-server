@@ -10,6 +10,9 @@ import couponRouter                      from "../modules/coupon/coupon.routes.j
 import pointsRouter                      from "../modules/points/points.routes.js";
 import inventoryRouter                   from "../modules/inventory/inventory.routes.js";
 import shopRouter                        from "../modules/shop/shop.routes.js";
+import categoryRouter                    from "../modules/category/category.routes.js";
+import notificationRouter                from "../modules/notification/notification.routes.js";
+import deliveryZoneRouter               from "../modules/delivery/deliveryzone.routes.js";
 
 const router = express.Router();
 
@@ -25,6 +28,9 @@ router.use("/admin/users", adminUserRouter);
 
 // ─── Products ─────────────────────────────────────────────────────────────────
 router.use("/products",    productRouter);
+
+// ─── Categories ───────────────────────────────────────────────────────────────
+router.use("/categories",  categoryRouter);
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 router.use("/orders",      orderRouter);
@@ -43,5 +49,8 @@ router.use("/points",      pointsRouter);
 
 // ─── Inventory (stock check / update) ────────────────────────────────────────
 router.use("/inventory",   inventoryRouter);
+
+// ─── Notifications (order updates, push tokens) ───────────────────────────────
+router.use("/notifications", notificationRouter);
 
 export default router;

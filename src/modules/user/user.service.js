@@ -53,7 +53,9 @@ export const removeProfilePic = async (userId) => {
 
 // ─── Addresses ────────────────────────────────────────────────────────────────
 export const addAddress = async (userId, addressData) => {
+  console.log('ADDRESS DATA:', JSON.stringify(addressData, null, 2)); // 👈 add this
   const user = await repo.findById(userId);
+  
   if (!user) throw new Error(MESSAGES.USER_NOT_FOUND);
 
   if (user.addresses.length >= 5) {

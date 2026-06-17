@@ -2,6 +2,7 @@ import Joi from "joi";
 import { Readable } from "stream";
 import cloudinary from "../../config/cloudinary.config.js";
 import { sharedSchemas } from "../auth/auth.validator.js";
+import { isMaldivesAddress } from "../../utils/geo.utils.js";
 
 const validate = (schema) => (req, res, next) => {
   const { error, value } = schema.validate(req.body, {
@@ -20,56 +21,82 @@ const validate = (schema) => (req, res, next) => {
 
 // ─── Add Address ──────────────────────────────────────────────────────────────
 export const addressBodySchema = Joi.object({
-  // FIX: renamed 'label' → 'type' (the enum category)
-  type:      Joi.string().valid("home", "work", "other").default("home"),
-  // FIX: added 'label' as optional free-text display name
-  label:     Joi.string().trim().allow("").default(""),
+  type:           Joi.string().valid("home", "work", "other").default("home"),
+  label:          Joi.string().trim().allow("").default(""),
   recipientName:  Joi.string().trim().allow("").default(""),
-  recipientPhone: Joi.string().trim().pattern(/^\+?[1-9]\d{9,14}$/).allow("").default(""),
-  street:    Joi.string().trim().required().messages({ "any.required": "Street is required" }),
-  city:      Joi.string().trim().required().messages({ "any.required": "City is required" }),
-  // FIX: state (atoll) is optional for Maldives
-  state:     Joi.string().trim().allow("", null).optional(),
-  // FIX: renamed 'postalCode' → 'zip'
-  zip:       Joi.string().trim().required().messages({ "any.required": "Postal code is required" }),
-  // FIX: default country changed from "India" → "Maldives"
+  recipientPhone: Joi.string().trim().allow("").default(""),
+  street:         Joi.string().trim().required().messages({ "any.required": "Street is required" }),
+  atoll:          Joi.string().trim().required().messages({ "any.required": "Atoll is required" }),
+  island:         Joi.string().trim().required().messages({ "any.required": "Island is required" }),
+  city:           Joi.string().trim().allow("", null).optional(),
+  state:          Joi.string().trim().allow("", null).optional(),
+  zip:            Joi.string().trim().required().messages({ "any.required": "Postal code is required" }),
   country: Joi.string()
-  .valid('Maldives', 'MV')
-  .default('Maldives')
-});
+    .valid("Maldives", "MV")
+    .default("Maldives")
+    .messages({ "any.only": "Outside Maldives is not allowed. We currently deliver within the Maldives only." }),
+  location: Joi.object({
+    latitude:  Joi.number().min(-90).max(90).allow(null).default(null),
+    longitude: Joi.number().min(-180).max(180).allow(null).default(null),
+  }).default({ latitude: null, longitude: null }),
+  locationLabel: Joi.string().trim().allow("").default(""),
+})
+  .custom((value, helpers) => {
+    if (!value.city && value.island && value.atoll) {
+      value.city = `${value.island}, ${value.atoll}`;
+    }
+    if (!isMaldivesAddress(value)) {
+      return helpers.error("any.invalid");
+    }
+    return value;
+  })
+  .messages({ "any.invalid": "Outside Maldives is not allowed. We currently deliver within the Maldives only." });
 
 // ─── Update Address ───────────────────────────────────────────────────────────
 export const updateAddressSchema = Joi.object({
-  // FIX: renamed 'label' → 'type'
-  type:      Joi.string().valid("home", "work", "other"),
-  // FIX: added optional label update
-  label:     Joi.string().trim().allow(""),
+  type:           Joi.string().valid("home", "work", "other"),
+  label:          Joi.string().trim().allow(""),
   recipientName:  Joi.string().trim().allow(""),
-  recipientPhone: Joi.string().trim().pattern(/^\+?[1-9]\d{9,14}$/).allow(""),
-  street:    Joi.string().trim(),
-  city:      Joi.string().trim(),
-  // FIX: state optional
-  state:     Joi.string().trim().allow("", null),
-  // FIX: renamed 'postalCode' → 'zip'
-  zip:       Joi.string().trim(),
-  country:   Joi.string().trim(),
-  isDefault: Joi.boolean(),
-}).min(1);
+  recipientPhone: Joi.string().trim().allow(""),
+  street:         Joi.string().trim(),
+  atoll:          Joi.string().trim(),
+  island:         Joi.string().trim(),
+  city:           Joi.string().trim().allow("", null),
+  state:          Joi.string().trim().allow("", null),
+  zip:            Joi.string().trim(),
+  country:        Joi.string().trim().valid("Maldives", "MV")
+                    .messages({ "any.only": "Outside Maldives is not allowed. We currently deliver within the Maldives only." }),
+  location: Joi.object({
+    latitude:  Joi.number().min(-90).max(90).allow(null),
+    longitude: Joi.number().min(-180).max(180).allow(null),
+  }),
+  locationLabel: Joi.string().trim().allow(""),
+  isDefault:     Joi.boolean(),
+})
+  .min(1)
+  .custom((value, helpers) => {
+    if ((value.country || value.location) && !isMaldivesAddress(value)) {
+      return helpers.error("any.invalid");
+    }
+    return value;
+  })
+  .messages({ "any.invalid": "Outside Maldives is not allowed. We currently deliver within the Maldives only." });
 
-// ─── Other profile schemas (unchanged) ───────────────────────────────────────
+// ─── Update Profile ───────────────────────────────────────────────────────────
 const updateProfileSchema = Joi.object({
-  name:  Joi.string().min(2).max(50),
-  phone: Joi.string().pattern(/^\+?[1-9]\d{9,14}$/),
+  name:  sharedSchemas.name,
+  phone: Joi.string().trim(),
 }).min(1);
 
+// ─── Admin Update User ────────────────────────────────────────────────────────
 const adminUpdateUserSchema = Joi.object({
   name:     sharedSchemas.name,
-  phone:    sharedSchemas.phone,
+  phone:    Joi.string().trim(),
   role:     Joi.string().valid("user", "admin", "superadmin"),
   isActive: Joi.boolean(),
 }).min(1);
 
-// ─── Profile picture upload (cloudinary) ─────────────────────────────────────
+// ─── Profile Picture Upload ───────────────────────────────────────────────────
 export const validateUpdateProfilePic = async (req, res, next) => {
   try {
     if (!req.file) {
@@ -98,7 +125,7 @@ export const validateUpdateProfilePic = async (req, res, next) => {
   }
 };
 
-
+// ─── Change Password ──────────────────────────────────────────────────────────
 const changePasswordSchema = Joi.object({
   currentPassword: Joi.string().required().messages({
     "any.required": "Current password is required",
