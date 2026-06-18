@@ -40,7 +40,7 @@ userRouter.put(
   '/me/profile-pic',
   protect,
   upload.single('profilePic'),  // ✅ multer — parses file into req.file
-  validateUpdateProfilePic,     // ✅ uploads to cloudinary → sets req.validatedBody
+  validateUpdateProfilePic,     // ✅ saves to local disk (public/uploads/profile_pics) → sets req.validatedBody
   updateProfilePic              // ✅ controller
 );
 userRouter.delete("/me/profile-pic", protect, removeProfilePic);

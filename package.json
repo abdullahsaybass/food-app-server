@@ -14,7 +14,6 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.73.5",
-    "cloudinary": "^1.30.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -31,7 +30,8 @@
     "multer": "^2.1.1",
     "multer-storage-cloudinary": "^4.0.0",
     "redis": "^5.12.1",
-    "uuid": "^13.0.0",
+    "sharp": "^0.35.1",
+    "uuid": "^13.0.2",
     "winston": "^3.19.0"
   },
   "devDependencies": {

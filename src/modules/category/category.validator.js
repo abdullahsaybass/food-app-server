@@ -3,7 +3,7 @@ import Joi from "joi";
 import { ValidationError } from "../../utils/apiError.js";
 
 const imageSchema = Joi.object({
-  url:      Joi.string().uri().required(),
+  url:      Joi.string().required(), // was: Joi.string().uri().required() — local storage returns relative paths like "/uploads/categories/abc.webp", which .uri() rejects
   publicId: Joi.string().allow("", null).default(null),
   altText:  Joi.string().allow("").default(""),
 });

@@ -1,6 +1,8 @@
 import Joi from "joi";
-import { Readable } from "stream";
-import cloudinary from "../../config/cloudinary.config.js";
+import path from "path";
+import fs from "fs";
+import sharp from "sharp";
+import { v4 as uuidv4 } from "uuid";
 import { sharedSchemas } from "../auth/auth.validator.js";
 import { isMaldivesAddress } from "../../utils/geo.utils.js";
 
@@ -96,27 +98,36 @@ const adminUpdateUserSchema = Joi.object({
   isActive: Joi.boolean(),
 }).min(1);
 
-// ─── Profile Picture Upload ───────────────────────────────────────────────────
+// ─── Profile Picture Upload (local disk storage) ──────────────────────────────
+const PROFILE_PICS_DIR = path.join(process.cwd(), "public", "uploads", "profile_pics");
+
+const ensureProfilePicsDir = () => {
+  if (!fs.existsSync(PROFILE_PICS_DIR)) {
+    fs.mkdirSync(PROFILE_PICS_DIR, { recursive: true });
+  }
+};
+
 export const validateUpdateProfilePic = async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, errors: ["No file uploaded"] });
     }
 
-    const uploadResult = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder:         "profile_pics",
-          transformation: [{ width: 400, height: 400, crop: "fill" }],
-        },
-        (error, result) => (error ? reject(error) : resolve(result))
-      );
-      Readable.from(req.file.buffer).pipe(stream);
-    });
+    ensureProfilePicsDir();
+
+    const filename = `${uuidv4()}.webp`;
+    const filepath = path.join(PROFILE_PICS_DIR, filename);
+
+    await sharp(req.file.buffer)
+      .resize(400, 400, { fit: "cover" })
+      .webp({ quality: 80 })
+      .toFile(filepath);
+
+    const publicId = `profile_pics/${filename}`;
 
     req.validatedBody = {
-      url:      uploadResult.secure_url,
-      publicId: uploadResult.public_id,
+      url:      `/uploads/${publicId}`,
+      publicId,
     };
 
     next();

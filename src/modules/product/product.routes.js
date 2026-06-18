@@ -18,12 +18,13 @@ router.post(
   '/upload-images',
   protect,
   adminOnly,
+  (req, res, next) => { req.uploadFolder = 'products'; next(); },
   upload.array('images', 5),
   uploadToCloud,
   (req, res) => {
     res.status(200).json({
       success: true,
-      data: req.cloudinaryImages,
+      data: req.uploadedImages,
     });
   }
 );

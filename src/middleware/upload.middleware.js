@@ -1,9 +1,25 @@
 // src/middleware/upload.middleware.js
 
 import multer from 'multer';
-import cloudinary from '../config/cloudinary.config.js';
+import path from 'path';
+import fs from 'fs';
+import sharp from 'sharp';
+import { v4 as uuidv4 } from 'uuid';
 
-// ── Your existing multer (memory storage) ──
+// ── Base directory where all uploaded images are stored ──
+// Files are served statically from /uploads (see app.js: app.use('/uploads', express.static(...)))
+const UPLOAD_ROOT = path.join(process.cwd(), 'public', 'uploads');
+
+// Ensure a given subfolder exists (e.g. public/uploads/products)
+const ensureDir = (folder) => {
+  const dir = path.join(UPLOAD_ROOT, folder);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+};
+
+// ── Multer: keep files in memory so we can resize with sharp before saving ──
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
@@ -20,40 +36,43 @@ export const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
 });
 
-// ── Upload a single buffer → Cloudinary via stream ──
-const uploadToCloudinary = (buffer, folder = 'grocify/products') => {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        resource_type: 'image',
-        transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto' }],
-      },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result);
-      }
-    );
-    stream.end(buffer);
-  });
+// ── Save one image buffer to disk (resized + compressed), return its public URL ──
+// folder: subfolder under public/uploads, e.g. 'products', 'categories', 'profile_pics'
+// options: { width, height, fit } passed to sharp resize
+const saveImageToDisk = async (buffer, folder = 'products', options = {}) => {
+  const { width = 800, height = 800, fit = 'inside' } = options;
+
+  const dir = ensureDir(folder);
+  const filename = `${uuidv4()}.webp`;
+  const filepath = path.join(dir, filename);
+
+  await sharp(buffer)
+    .resize(width, height, { fit, withoutEnlargement: true })
+    .webp({ quality: 80 })
+    .toFile(filepath);
+
+  const publicId = `${folder}/${filename}`; // used later for deletion
+  const url = `/uploads/${publicId}`;       // relative path; combine with your domain on the client
+
+  return { url, publicId };
 };
 
-// ── Middleware: streams all req.files buffers → Cloudinary ──
-// Attaches req.cloudinaryImages = [{ url, publicId, altText }]
-// Optionally set req.uploadFolder before this middleware to target a different Cloudinary folder.
+// ── Middleware: saves all req.files buffers to disk ──
+// Attaches req.uploadedImages = [{ url, publicId, altText }]
+// Optionally set req.uploadFolder before this middleware to target a different subfolder.
 export const uploadToCloud = async (req, res, next) => {
   if (!req.files || req.files.length === 0) return next();
 
   try {
-    const folder = req.uploadFolder || 'grocify/products';
+    const folder = req.uploadFolder || 'products';
 
     const uploaded = await Promise.all(
-      req.files.map((file) => uploadToCloudinary(file.buffer, folder))
+      req.files.map((file) => saveImageToDisk(file.buffer, folder))
     );
 
-    req.cloudinaryImages = uploaded.map((result) => ({
-      url:      result.secure_url,
-      publicId: result.public_id,
+    req.uploadedImages = uploaded.map((result) => ({
+      url:      result.url,
+      publicId: result.publicId,
       altText:  '',
     }));
 
@@ -63,7 +82,17 @@ export const uploadToCloud = async (req, res, next) => {
   }
 };
 
-// ── Delete from Cloudinary ──
+// ── Delete an image from disk given its publicId (e.g. 'products/abc123.webp') ──
 export const deleteFromCloudinary = async (publicId) => {
-  return cloudinary.uploader.destroy(publicId);
+  const filepath = path.join(UPLOAD_ROOT, publicId);
+
+  // Guard against path traversal — resolved path must stay within UPLOAD_ROOT
+  const resolved = path.resolve(filepath);
+  if (!resolved.startsWith(path.resolve(UPLOAD_ROOT))) {
+    throw new Error('Invalid publicId');
+  }
+
+  if (fs.existsSync(resolved)) {
+    fs.unlinkSync(resolved);
+  }
 };

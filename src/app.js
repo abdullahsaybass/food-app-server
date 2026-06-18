@@ -8,6 +8,7 @@ import cors from "cors";
 
 import router from "./routers/index.routes.js";
 import { notFoundHandler, errorHandler } from "./middleware/error.middleware.js";
+import path from "path";
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.get("/", (req, res) => {
 
 app.use("/api", router);
 
+app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 // ✅ 404
 app.use(notFoundHandler);
 

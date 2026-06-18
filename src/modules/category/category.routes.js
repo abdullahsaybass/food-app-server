@@ -28,11 +28,11 @@ router.post(
   "/upload-image",
   protect,
   restrictTo("admin", "superadmin"),
-  (req, res, next) => { req.uploadFolder = "grocify/categories"; next(); },
+  (req, res, next) => { req.uploadFolder = "categories"; next(); },
   upload.array("images", 1),
   uploadToCloud,
   asyncHandler(async (req, res) => {
-    const image = req.cloudinaryImages?.[0];
+    const image = req.uploadedImages?.[0];
     if (!image) {
       throw new BadRequestError("No file uploaded");
     }
