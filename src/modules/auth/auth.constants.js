@@ -51,4 +51,9 @@ export const MESSAGES = {
   // Generic
   INTERNAL_ERROR: "Internal server error",
   NOT_FOUND:      "Route not found",
+
+  // Google OAuth
+  GOOGLE_TOKEN_INVALID: "Invalid Google token. Please try again.",
+  GOOGLE_NO_EMAIL:      "Google account has no email address.",
+  GOOGLE_AUTH_SUCCESS:  "Google authentication successful.",
 };

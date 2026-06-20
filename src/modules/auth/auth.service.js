@@ -1,7 +1,10 @@
 import jwt    from "jsonwebtoken";
 import crypto from "crypto";
+import { OAuth2Client } from "google-auth-library";
 import { JWT_EXPIRES_IN, MESSAGES } from "./auth.constants.js";
 import * as repo from "./auth.repository.js";
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 const generateAccessToken = (id) =>
@@ -129,4 +132,49 @@ export const resetPassword = async (token, newPassword) => {
   await user.save();
 
   return { success: true, message: MESSAGES.PASSWORD_RESET_SUCCESS };
+};
+
+// ─── Google Auth ──────────────────────────────────────────────────────────────
+export const googleAuthUser = async (idToken) => {
+  // 1. Verify the ID token with Google
+  let payload;
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    return { unauthorized: true, message: MESSAGES.GOOGLE_TOKEN_INVALID };
+  }
+
+  const { sub: googleId, email, name, picture } = payload;
+
+  if (!email) {
+    return { unauthorized: true, message: MESSAGES.GOOGLE_NO_EMAIL };
+  }
+
+  // 2. Find or create user
+  const { user, isNew } = await repo.findOrCreateGoogleUser({
+    googleId,
+    email,
+    name:       name ?? email.split("@")[0],
+    profilePic: picture ?? null,
+  });
+
+  if (!user.isActive) {
+    return { forbidden: true, message: MESSAGES.ACCOUNT_DEACTIVATED };
+  }
+
+  // 3. Issue tokens
+  const accessToken  = generateAccessToken(user._id);
+  const refreshToken = generateRefreshToken(user._id);
+
+  await repo.saveRefreshToken(user._id, refreshToken);
+
+  const userObj = user.toObject ? user.toObject() : user;
+  delete userObj.password;
+  delete userObj.refreshToken;
+
+  return { user: userObj, accessToken, refreshToken, isNew };
 };

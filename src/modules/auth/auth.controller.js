@@ -1,6 +1,5 @@
 import { MESSAGES } from "./auth.constants.js";
 import * as service from "./auth.service.js";
-
 // ─── Register ─────────────────────────────────────────────────────────────────
 export const register = async (req, res, next) => {
   try {
@@ -118,6 +117,38 @@ export const resetPassword = async (req, res, next) => {
     }
 
     return res.status(200).json({ success: true, message: result.message });
+  } catch (err) {
+    next(err);
+  }
+};
+// ─── Google Auth ──────────────────────────────────────────────────────────────
+export const googleAuth = async (req, res, next) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ success: false, message: "idToken is required" });
+    }
+
+    const result = await service.googleAuthUser(idToken);
+
+    if (result.unauthorized) {
+      return res.status(401).json({ success: false, message: result.message });
+    }
+    if (result.forbidden) {
+      return res.status(403).json({ success: false, message: result.message });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: result.isNew ? MESSAGES.REGISTER_SUCCESS : MESSAGES.LOGIN_SUCCESS,
+      data: {
+        user:         result.user,
+        accessToken:  result.accessToken,
+        refreshToken: result.refreshToken,
+        isNew:        result.isNew,
+      },
+    });
   } catch (err) {
     next(err);
   }

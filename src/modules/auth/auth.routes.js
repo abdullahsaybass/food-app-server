@@ -13,16 +13,18 @@ import {
   refreshToken,
   forgotPassword,
   resetPassword,
+  googleAuth,
 } from "./auth.controller.js";
 
 export const authRouter = express.Router();
 
 // ─── Public ───────────────────────────────────────────────────────────────────
-authRouter.post("/register",       validateRegister,       register);
-authRouter.post("/login",          validateLogin,          login);
-authRouter.post("/refresh-token",                          refreshToken);
+authRouter.post("/register",        validateRegister,       register);
+authRouter.post("/login",           validateLogin,          login);
+authRouter.post("/refresh-token",                           refreshToken);
 authRouter.post("/forgot-password", validateForgotPassword, forgotPassword);
 authRouter.post("/reset-password",  validateResetPassword,  resetPassword);
+authRouter.post("/google",                                  googleAuth);
 
 // ─── Protected ────────────────────────────────────────────────────────────────
 authRouter.post("/logout", protect, logout);

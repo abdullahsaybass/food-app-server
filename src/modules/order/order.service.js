@@ -151,8 +151,8 @@ class OrderService {
       atoll: resolvedAddress.state || null,
     });
 
-    const totalAmount = itemsTotal + deliveryCharge;
-    const orderNumber = await generateOrderNumber();
+    const totalAmount         = itemsTotal + deliveryCharge;
+    const orderNumber         = await generateOrderNumber();
     const estimatedDeliveryAt = calculateEstimatedDelivery();
 
     // 4. Create order with initial timeline entry
@@ -173,6 +173,15 @@ class OrderService {
 
     // 6. Notify user: order placed
     await notificationService.sendOrderStatusNotification(userId, order, ORDER_STATUS.PENDING);
+
+    // 7. Auto-generate invoice
+    try {
+      const { default: invoiceService } = await import("../invoice/invoice.service.js");
+      await invoiceService.createFromOrder(order.toObject ? order.toObject() : order);
+    } catch (err) {
+      // Invoice generation failure must NOT block the order response
+      console.error("[invoice] Failed to auto-create invoice for order", order._id, err);
+    }
 
     return order;
   }
@@ -258,8 +267,6 @@ class OrderService {
   }
 
   // ── Admin: update status ──────────────────────────────────────────────────────
-  // Flow: pending (Order Placed) -> confirmed (Confirmation) -> processing
-  //       -> shipped (On the Way) -> delivered
   async updateOrderStatus(orderId, newStatus, adminId) {
     const order = await orderRepository.findByIdRaw(orderId);
     if (!order) throw new NotFoundError("Order");
@@ -283,7 +290,6 @@ class OrderService {
 
     const saved = await orderRepository.save(order);
 
-    // ── Notify the customer about every status change ────────────────────────────
     await notificationService.sendOrderStatusNotification(order.user, saved, newStatus);
 
     return saved;

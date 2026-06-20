@@ -7,12 +7,12 @@ import orderRouter                       from "../modules/order/order.routes.js"
 import cartRouter                        from "../modules/cart/cart.routes.js";
 import bannerRouter                      from "../modules/banner/banner.routes.js";
 import couponRouter                      from "../modules/coupon/coupon.routes.js";
-import pointsRouter                      from "../modules/points/points.routes.js";
 import inventoryRouter                   from "../modules/inventory/inventory.routes.js";
 import shopRouter                        from "../modules/shop/shop.routes.js";
 import categoryRouter                    from "../modules/category/category.routes.js";
 import notificationRouter                from "../modules/notification/notification.routes.js";
-import deliveryZoneRouter               from "../modules/delivery/deliveryzone.routes.js";
+import deliveryZoneRouter                from "../modules/delivery/deliveryzone.routes.js";
+import invoiceRouter                     from "../modules/invoice/invoice.routes.js";
 
 const router = express.Router();
 
@@ -45,7 +45,9 @@ router.use("/banners",     bannerRouter);
 router.use("/coupons",     couponRouter);
 
 // ─── Points (referral / purchase / invite) ────────────────────────────────────
-router.use("/points",      pointsRouter);
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
+router.use("/invoices", invoiceRouter);
 
 // ─── Inventory (stock check / update) ────────────────────────────────────────
 router.use("/inventory",   inventoryRouter);
