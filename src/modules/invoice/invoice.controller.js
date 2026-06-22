@@ -44,8 +44,20 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
   });
 });
 
+// ── PATCH /admin/:id/notes ─────────────────────────────────────────────────────
+export const updateInvoiceNotes = asyncHandler(async (req, res) => {
+  const { notes } = req.body;
+  const invoice = await invoiceService.updateNotes(req.params.id, notes, req.user);
+  res.status(200).json({
+    success: true,
+    message: INVOICE_MESSAGES.NOTES_UPDATED,
+    data:    mapInvoice(invoice),
+  });
+});
+
+// ── PATCH /admin/:id/void ──────────────────────────────────────────────────────
 export const voidInvoice = asyncHandler(async (req, res) => {
-  const invoice = await invoiceService.voidInvoice(req.params.id);
+  const invoice = await invoiceService.voidInvoice(req.params.id, req.user);
   res.status(200).json({
     success: true,
     message: "Invoice voided successfully.",

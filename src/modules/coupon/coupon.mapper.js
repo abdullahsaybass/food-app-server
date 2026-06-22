@@ -17,7 +17,7 @@ export const toCouponDTO = (coupon) => {
     // ───────── Discount ─────────
     discountType:      c.discountType,
     discountValue:     c.discountValue     ?? 0,
-    maxDiscountAmount: c.maxDiscountAmount ?? 0,
+    maxDiscount: c.maxDiscount ?? 0,
 
     // ───────── Eligibility ─────────
     minOrderValue:        c.minOrderValue        ?? 0,
@@ -58,5 +58,5 @@ export const toCouponApplyDTO = (coupon, discountAmount) => ({
   discountType: coupon.discountType,
   discountValue: coupon.discountValue,
   discountAmount,           // actual ₹ saved
-  message:      `Coupon applied! You save ₹${discountAmount.toFixed(2)}.`,
+  message:      `Coupon applied! You save MVR ${discountAmount.toFixed(2)}.`,
 });

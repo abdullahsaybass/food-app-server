@@ -5,6 +5,7 @@ import {
   getInvoiceById,
   getInvoiceByOrderId,
   getAllInvoices,
+  updateInvoiceNotes,
   voidInvoice,
 } from "./invoice.controller.js";
 import {
@@ -18,8 +19,9 @@ const router = Router();
 router.use(protect);
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
-router.get(  "/admin/all",      restrictTo("admin", "superadmin"), validateAdminInvoicesQuery, getAllInvoices);
-router.patch("/admin/:id/void", restrictTo("admin", "superadmin"),                             voidInvoice);
+router.get(  "/admin/all",        restrictTo("admin", "superadmin"), validateAdminInvoicesQuery, getAllInvoices);
+router.patch("/admin/:id/void",   restrictTo("admin", "superadmin"),                             voidInvoice);
+router.patch("/admin/:id/notes",  restrictTo("admin", "superadmin"),                             updateInvoiceNotes);
 
 // ── User ──────────────────────────────────────────────────────────────────────
 router.get("/",               validateUserInvoicesQuery, getMyInvoices);

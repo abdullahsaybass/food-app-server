@@ -36,6 +36,7 @@ router.get('/:id', protect, adminOnly, couponController.getCoupon);
 // ───────────────────────────────────────────────────────────────
 router.post(  '/',                 protect, adminOnly, validateCreateCoupon, couponController.createCoupon);
 router.put(   '/:id',              protect, adminOnly, validateUpdateCoupon, couponController.updateCoupon);
+router.patch( '/:id',              protect, adminOnly, validateUpdateCoupon, couponController.updateCoupon);
 router.patch( '/:id/deactivate',   protect, adminOnly, couponController.deactivateCoupon);
 router.delete('/:id',              protect, adminOnly, couponController.deleteCoupon);
 

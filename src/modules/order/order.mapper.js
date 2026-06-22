@@ -27,9 +27,14 @@ export const mapOrder = (order) => ({
   statusLabel:         ORDER_STATUS_LABELS[order.status] ?? order.status,
   paymentMethod:       order.paymentMethod,
   paymentStatus:       order.paymentStatus,
+
+  // ── Full pricing breakdown ─────────────────────────────────────────────────
+  itemsTotal:          order.itemsTotal    ?? (order.totalAmount - (order.deliveryCharge ?? 0) + (order.discountAmount ?? 0)),
+  deliveryCharge:      order.deliveryCharge  ?? 0,
+  couponCode:          order.couponCode      ?? null,
+  discountAmount:      order.discountAmount  ?? 0,
   totalAmount:         order.totalAmount,
-  deliveryCharge:      order.deliveryCharge ?? 0,
-  itemsTotal:          order.totalAmount - (order.deliveryCharge ?? 0),
+
   items:               (order.items || []).map(mapOrderItem),
   shippingAddress:     order.shippingAddress,
   statusTimeline:      (order.statusTimeline ?? []).map(mapTimelineEntry),

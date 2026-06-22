@@ -32,7 +32,7 @@ const createCouponSchema = Joi.object({
     otherwise: Joi.number().min(0.01).required(),
   }),
 
-  maxDiscountAmount: Joi.when('discountType', {
+  maxDiscount: Joi.when('discountType', {
     is:        COUPON_DISCOUNT_TYPES.PERCENTAGE,
     then:      Joi.number().min(0).default(0),
     otherwise: Joi.number().default(0),
@@ -76,7 +76,7 @@ const updateCouponSchema = Joi.object({
     .optional(),
 
   discountValue:     Joi.number().min(0).optional(),
-  maxDiscountAmount: Joi.number().min(0).optional(),
+  maxDiscount: Joi.number().min(0).optional(),
   minOrderValue:     Joi.number().min(0).optional(),
 
   applicableProducts:   Joi.array().items(Joi.string().hex().length(24)).optional(),

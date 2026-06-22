@@ -4,7 +4,7 @@
 
 export const COUPON_DISCOUNT_TYPES = {
   PERCENTAGE: 'percentage',  // e.g. 10%
-  FLAT:       'flat',        // e.g. ₹50 off
+  FLAT:       'fixed',       // e.g. MVR 50 off (matches frontend's "fixed" type)
   FREE_SHIP:  'free_shipping',
 };
 

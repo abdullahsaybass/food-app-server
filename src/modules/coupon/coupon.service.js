@@ -106,8 +106,8 @@ export const applyCoupon = async (code, orderTotal, userId) => {
 
   if (coupon.discountType === COUPON_DISCOUNT_TYPES.PERCENTAGE) {
     discountAmount = (orderTotal * coupon.discountValue) / 100;
-    if (coupon.maxDiscountAmount > 0) {
-      discountAmount = Math.min(discountAmount, coupon.maxDiscountAmount);
+    if (coupon.maxDiscount > 0) {
+      discountAmount = Math.min(discountAmount, coupon.maxDiscount);
     }
   } else if (coupon.discountType === COUPON_DISCOUNT_TYPES.FLAT) {
     discountAmount = Math.min(coupon.discountValue, orderTotal);

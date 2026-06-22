@@ -58,6 +58,7 @@ const placeOrderSchema = Joi.object({
   }),
   addressId:       Joi.string().hex().length(24).optional(),
   shippingAddress: shippingAddressSchema.optional(),
+  couponCode:      Joi.string().trim().uppercase().optional().allow("", null),
 });
 
 const cancelOrderSchema = Joi.object({

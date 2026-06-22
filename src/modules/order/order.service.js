@@ -5,6 +5,7 @@ import Product         from "../product/product.model.js";
 import User            from "../user/user.model.js";
 import notificationService from "../../services/notification/notification.service.js";
 import deliveryZoneService from "../delivery/deliveryzone.service.js";
+import * as couponService  from "../coupon/coupon.service.js";
 import { isMaldivesAddress } from "../../utils/geo.utils.js";
 import {
   ORDER_STATUS,
@@ -51,7 +52,7 @@ const deductStock = (items) =>
     )
   );
 
-// ── Helper: restore variant stock ────────────────────────────────────────────
+// ── Helper: restore variant stock ─────────────────────────────────────────────
 const restoreStock = (items) =>
   Promise.all(
     items.map((item) =>
@@ -65,8 +66,8 @@ const restoreStock = (items) =>
 
 class OrderService {
   // ── Place order ─────────────────────────────────────────────────────────────
-  async placeOrder(userId, { items, addressId, shippingAddress }) {
-    // ── 1. Resolve shipping address ───────────────────────────────────────────
+  async placeOrder(userId, { items, addressId, shippingAddress, couponCode }) {
+    // 1. Resolve shipping address
     let resolvedAddress;
 
     if (shippingAddress) {
@@ -100,7 +101,7 @@ class OrderService {
       };
     }
 
-    // ── 1b. Maldives-only delivery check ───────────────────────────────────────
+    // 1b. Maldives-only delivery check
     if (!isMaldivesAddress(resolvedAddress)) {
       throw new BadRequestError(ORDER_MESSAGES.OUTSIDE_MALDIVES);
     }
@@ -143,43 +144,66 @@ class OrderService {
       };
     });
 
-    const itemsTotal  = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    // 4. Pricing: itemsTotal → deliveryCharge → coupon → totalAmount
+    const itemsTotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
-    // Resolve delivery charge based on city + atoll of the shipping address
     const deliveryCharge = await deliveryZoneService.resolveCharge({
       city:  resolvedAddress.city  || null,
       atoll: resolvedAddress.state || null,
     });
 
-    const totalAmount         = itemsTotal + deliveryCharge;
+    // Apply coupon if provided — validate against itemsTotal (pre-delivery subtotal)
+    let discountAmount    = 0;
+    let appliedCouponCode = null;
+
+    if (couponCode) {
+      const result      = await couponService.applyCoupon(couponCode, itemsTotal, userId);
+      discountAmount    = result.discountAmount;
+      appliedCouponCode = result.coupon.code;
+    }
+
+    // Grand total = subtotal + delivery - discount (floor at 0)
+    const totalAmount = Math.max(0, itemsTotal + deliveryCharge - discountAmount);
+
     const orderNumber         = await generateOrderNumber();
     const estimatedDeliveryAt = calculateEstimatedDelivery();
 
-    // 4. Create order with initial timeline entry
+    // 5. Create order
     const order = await orderRepository.create({
       orderNumber,
       user:            userId,
       items:           resolvedItems,
       shippingAddress: resolvedAddress,
       paymentMethod:   "cod",
+      itemsTotal,
       deliveryCharge,
+      couponCode:      appliedCouponCode,
+      discountAmount,
       totalAmount,
       estimatedDeliveryAt,
       statusTimeline:  [{ status: ORDER_STATUS.PENDING, changedBy: userId, at: new Date() }],
     });
 
-    // 5. Deduct variant stock
+    // 6. Record coupon usage (non-blocking)
+    if (appliedCouponCode) {
+      try {
+        await couponService.recordCouponUsage(appliedCouponCode, userId);
+      } catch (err) {
+        console.error("[coupon] Failed to record usage for", appliedCouponCode, err);
+      }
+    }
+
+    // 7. Deduct variant stock
     await deductStock(resolvedItems);
 
-    // 6. Notify user: order placed
+    // 8. Notify user: order placed
     await notificationService.sendOrderStatusNotification(userId, order, ORDER_STATUS.PENDING);
 
-    // 7. Auto-generate invoice
+    // 9. Auto-generate invoice
     try {
       const { default: invoiceService } = await import("../invoice/invoice.service.js");
       await invoiceService.createFromOrder(order.toObject ? order.toObject() : order);
     } catch (err) {
-      // Invoice generation failure must NOT block the order response
       console.error("[invoice] Failed to auto-create invoice for order", order._id, err);
     }
 

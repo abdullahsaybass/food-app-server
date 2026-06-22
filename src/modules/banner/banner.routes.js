@@ -9,6 +9,9 @@ import {
   validateListBanners,
 } from './banner.validator.js';
 import * as bannerController from './banner.controller.js';
+import { upload, uploadToCloud, deleteFromCloudinary } from '../../middleware/upload.middleware.js';
+import asyncHandler from '../../utils/asyncHandler.js';
+import { BadRequestError } from '../../utils/apiError.js';
 
 const router = Router();
 
@@ -17,6 +20,36 @@ const router = Router();
 // GET /api/banners/live?position=home_top
 // ───────────────────────────────────────────────────────────────
 router.get('/live', bannerController.getLiveBanners);
+
+// ───────────────────────────────────────────────────────────────
+// ADMIN — image upload (mirrors category/product upload pattern)
+// POST   /api/banners/upload-image   (multipart/form-data, field name: "images")
+// DELETE /api/banners/upload-image/:publicId
+// ───────────────────────────────────────────────────────────────
+router.post(
+  '/upload-image',
+  protect,
+  adminOnly,
+  (req, res, next) => { req.uploadFolder = 'banners'; next(); },
+  upload.array('images', 1),
+  uploadToCloud,
+  asyncHandler(async (req, res) => {
+    const image = req.uploadedImages?.[0];
+    if (!image) throw new BadRequestError('No file uploaded');
+    res.status(200).json({ success: true, url: image.url, publicId: image.publicId });
+  })
+);
+
+router.delete(
+  '/upload-image/:publicId',
+  protect,
+  adminOnly,
+  asyncHandler(async (req, res) => {
+    const publicId = decodeURIComponent(req.params.publicId);
+    await deleteFromCloudinary(publicId);
+    res.status(200).json({ success: true, message: 'Image deleted' });
+  })
+);
 
 // ───────────────────────────────────────────────────────────────
 // PROTECTED — any logged-in user can view banners

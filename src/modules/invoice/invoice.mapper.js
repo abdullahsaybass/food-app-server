@@ -18,6 +18,14 @@ const mapInvoiceItem = (item) => ({
   subtotal: item.subtotal,
 });
 
+const mapHistoryEntry = (entry) => ({
+  action:      entry.action,
+  performedBy: entry.performedBy ?? { name: "System" },
+  status:      entry.status ?? null,
+  note:        entry.note   ?? null,
+  at:          entry.at,
+});
+
 export const mapInvoice = (inv) => ({
   id:            inv._id,
   invoiceNumber: inv.invoiceNumber,
@@ -39,16 +47,31 @@ export const mapInvoice = (inv) => ({
   items:          (inv.items || []).map(mapInvoiceItem),
   itemsTotal:     inv.itemsTotal,
   deliveryCharge: inv.deliveryCharge ?? 0,
-  totalAmount:    inv.totalAmount,
 
+  // ── Discount ──────────────────────────────────────────────────────────────
+  discount: {
+    code:   inv.discount?.code   ?? null,
+    amount: inv.discount?.amount ?? 0,
+  },
+
+  totalAmount:    inv.totalAmount,
   billingAddress: inv.billingAddress,
   paymentMethod:  inv.paymentMethod,
   paymentStatus:  inv.paymentStatus,
 
+  // ── Delivery status (from order) ──────────────────────────────────────────
+  deliveryStatus: inv.deliveryStatus ?? "pending",
+
+  // ── Notes & dates ─────────────────────────────────────────────────────────
+  notes:     inv.notes    ?? null,
+  dueDate:   inv.dueDate  ?? null,
   issuedAt:  inv.issuedAt,
   voidedAt:  inv.voidedAt ?? null,
   createdAt: inv.createdAt,
   updatedAt: inv.updatedAt,
+
+  // ── Audit history ─────────────────────────────────────────────────────────
+  history: (inv.history || []).map(mapHistoryEntry),
 });
 
 export const mapInvoiceList = (invoices, { page, limit, total }) => ({

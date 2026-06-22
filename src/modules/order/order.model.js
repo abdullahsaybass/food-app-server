@@ -58,7 +58,14 @@ const orderSchema = new mongoose.Schema(
 
     user:            { type: mongoose.Schema.Types.ObjectId, ref: "User",    required: true, index: true },
     items:           { type: [orderItemSchema], required: true },
-    totalAmount:     { type: Number, required: true, min: 0 },
+
+    // ── Pricing breakdown ──────────────────────────────────────────────────────
+    itemsTotal:      { type: Number, required: true, min: 0 }, // sum of item prices before discount
+    deliveryCharge:  { type: Number, default: 0,    min: 0 },
+    couponCode:      { type: String, default: null, trim: true },
+    discountAmount:  { type: Number, default: 0,    min: 0 },  // MVR deducted by coupon
+    totalAmount:     { type: Number, required: true, min: 0 }, // itemsTotal + deliveryCharge - discountAmount
+
     shippingAddress: { type: shippingAddressSchema, required: true },
     paymentMethod:   { type: String, default: "cod" },
     paymentStatus:   { type: String, enum: Object.values(PAYMENT_STATUS), default: PAYMENT_STATUS.PENDING },

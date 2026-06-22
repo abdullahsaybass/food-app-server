@@ -36,7 +36,7 @@ const couponSchema = new mongoose.Schema(
       min:     0,
     },
 
-    maxDiscountAmount: {
+    maxDiscount: {
       // cap for percentage discounts (e.g. max ₹200 off)
       type:    Number,
       default: 0,
